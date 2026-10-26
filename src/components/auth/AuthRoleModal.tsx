@@ -62,9 +62,39 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
       onClose();
       return;
     }
+
+    // If already authenticated this session, switch and close immediately!
+    const alreadyAuth = localStorage.getItem('halisaha_admin_authenticated') === 'true';
+    if (alreadyAuth) {
+      setCurrentUser(admin);
+      try {
+        confetti({ particleCount: 30, spread: 60, origin: { y: 0.7 } });
+      } catch {}
+      onClose();
+      return;
+    }
+
     setPendingAdmin(admin);
     setPinInput('');
     setPinError(null);
+  };
+
+  const handlePinInput = (val: string) => {
+    setPinInput(val);
+    setPinError(null);
+    const correctPin = getCouncilPin();
+
+    // Auto-verify as soon as the correct PIN is typed
+    if (val.trim() === correctPin) {
+      if (pendingAdmin) {
+        localStorage.setItem('halisaha_admin_authenticated', 'true');
+        setCurrentUser(pendingAdmin);
+        try {
+          confetti({ particleCount: 35, spread: 60, origin: { y: 0.7 } });
+        } catch {}
+        onClose();
+      }
+    }
   };
 
   const handleVerifyPin = (e?: React.FormEvent) => {
@@ -140,21 +170,26 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex justify-center items-start overflow-y-auto p-2 sm:p-4 pt-3 sm:pt-6">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden my-auto animate-in zoom-in-95">
-        
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        className="bg-slate-900 border border-slate-700/80 rounded-3xl max-w-lg w-full shadow-2xl flex flex-col max-h-[85vh] overflow-hidden my-auto animate-in zoom-in-95 duration-200"
+      >
         {/* ============================================================ */}
         {/* PINNED FIXED TOP HEADER — NEVER SCROLLS OUT OF VIEW          */}
         {/* ============================================================ */}
-        <div className="p-3.5 sm:p-4 border-b border-slate-800 bg-slate-900 shrink-0 space-y-3 z-10">
+        <div className="p-4 border-b border-slate-800 bg-slate-900 shrink-0 space-y-3 z-10">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2.5">
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white shrink-0">
-                <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white shrink-0">
+                <Shield className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-black text-white text-xs sm:text-sm">Kullanıcı Girişi & Güvenlik</h3>
-                <p className="text-[10px] text-slate-400">Yönetici (Konsey) veya Misafir / Oyuncu</p>
+                <h3 className="font-black text-white text-sm sm:text-base">Kullanıcı Girişi & Güvenlik</h3>
+                <p className="text-[11px] text-slate-400">Yönetici (Konsey) veya Misafir / Oyuncu</p>
               </div>
             </div>
             <button
@@ -162,11 +197,11 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
               className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
               title="Kapat"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* PINNED TWO-TONE TAB SWITCHER (ALWAYS AT THE VERY TOP) */}
+          {/* PINNED TWO-TONE TAB SWITCHER (ALWAYS VISIBLE AT TOP) */}
           <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-950 rounded-2xl border border-slate-800 text-xs font-bold">
             <button
               type="button"
@@ -207,11 +242,10 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
         {/* ============================================================ */}
         {/* SCROLLABLE CONTENT BODY                                     */}
         {/* ============================================================ */}
-        <div className="p-3.5 sm:p-4 overflow-y-auto flex-1 min-h-0 space-y-3">
-          
+        <div className="p-4 overflow-y-auto flex-1 min-h-0 space-y-3.5">
           {/* Current Active Profile Info */}
-          <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between text-xs">
-            <div className="flex items-center space-x-2">
+          <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between text-xs">
+            <div className="flex items-center space-x-2.5">
               {currentUser.role === 'admin' ? (
                 <Crown className="w-4 h-4 text-amber-400" />
               ) : currentUser.role === 'council_member' ? (
@@ -222,13 +256,13 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
                 <User className="w-4 h-4 text-slate-400" />
               )}
               <div>
-                <span className="text-[10px] text-slate-400 block">Şu Anki Giriş:</span>
-                <span className="font-bold text-white">{currentUser.name}</span>
+                <span className="text-[10px] text-slate-400 block">Şu Anki Oturum:</span>
+                <span className="font-black text-white text-sm">{currentUser.name}</span>
               </div>
             </div>
             <div className="flex items-center space-x-2">
               <span
-                className={`text-[10px] px-2 py-0.5 rounded-full font-black border ${
+                className={`text-[10px] px-2.5 py-1 rounded-full font-black border ${
                   currentUser.role === 'admin'
                     ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
                     : currentUser.role === 'council_member'
@@ -251,7 +285,7 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
                 <button
                   onClick={handleLogoutToGuest}
                   title="Yönetici Oturumunu Kapat (Misafir Moduna Geç)"
-                  className="p-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 text-xs transition-all active:scale-95 flex items-center space-x-1"
+                  className="p-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 text-xs transition-all active:scale-95 flex items-center space-x-1"
                 >
                   <LogOut className="w-3.5 h-3.5" />
                   <span className="text-[10px] font-bold">Çıkış</span>
@@ -280,15 +314,15 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
                 <span className="text-xs font-bold text-slate-300">Konsey Giriş Doğrulaması</span>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-center space-y-2">
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-center space-y-2">
                 <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 mx-auto flex items-center justify-center">
                   <Lock className="w-6 h-6" />
                 </div>
-                <h4 className="font-black text-white text-sm">
+                <h4 className="font-black text-white text-base">
                   👑 {pendingAdmin.name} Oturumu
                 </h4>
-                <p className="text-[11px] text-amber-200 leading-relaxed">
-                  Yönetici ve puanlama yetkileri için lütfen <strong>4 haneli Konsey PIN şifrenizi</strong> giriniz:
+                <p className="text-xs text-amber-200 leading-relaxed">
+                  Yönetici yetkileri için lütfen <strong>4 haneli Konsey PIN şifrenizi</strong> giriniz:
                 </p>
               </div>
 
@@ -299,18 +333,15 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
                     inputMode="numeric"
                     maxLength={8}
                     autoFocus
-                    placeholder="PIN Kodu (Örn: 1453)"
+                    placeholder="PIN Kodu (1453)"
                     value={pinInput}
-                    onChange={e => {
-                      setPinInput(e.target.value);
-                      setPinError(null);
-                    }}
-                    className="w-full text-center text-xl tracking-[0.4em] py-3 bg-slate-950 border border-slate-700 rounded-xl text-white placeholder:text-slate-600 placeholder:text-xs placeholder:tracking-normal focus:outline-none focus:border-amber-500 font-mono font-bold"
+                    onChange={e => handlePinInput(e.target.value)}
+                    className="w-full text-center text-2xl tracking-[0.4em] py-3.5 bg-slate-950 border border-slate-700 rounded-2xl text-white placeholder:text-slate-600 placeholder:text-xs placeholder:tracking-normal focus:outline-none focus:border-amber-500 font-mono font-bold"
                   />
                 </div>
 
                 {pinError && (
-                  <div className="p-2 rounded-xl bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-bold flex items-center space-x-1.5 animate-shake">
+                  <div className="p-2.5 rounded-xl bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-bold flex items-center space-x-1.5 animate-shake">
                     <AlertCircle className="w-4 h-4 shrink-0" />
                     <span>{pinError}</span>
                   </div>
@@ -319,16 +350,16 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
                 <button
                   type="submit"
                   disabled={!pinInput.trim()}
-                  className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 disabled:opacity-50 text-black font-black text-xs shadow-lg shadow-amber-500/20 transition-all active:scale-95 flex items-center justify-center space-x-1.5"
+                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 disabled:opacity-50 text-black font-black text-sm shadow-xl shadow-amber-500/20 transition-all active:scale-95 flex items-center justify-center space-x-2"
                 >
                   <KeyRound className="w-4 h-4" />
-                  <span>Doğrula ve Yönetici Olarak Gir</span>
+                  <span>Giriş Yap ve Kapat</span>
                 </button>
               </form>
 
               <div className="text-center pt-1">
-                <span className="text-[10px] text-slate-500">
-                  Varsayılan Konsey PIN: <code className="text-amber-400/80 font-mono">1453</code>
+                <span className="text-[11px] text-slate-500">
+                  Varsayılan Konsey PIN: <code className="text-amber-400/80 font-mono font-bold">1453</code>
                 </span>
               </div>
             </div>
@@ -363,7 +394,7 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
                     value={currentPinInput}
                     onChange={e => setCurrentPinInput(e.target.value)}
                     placeholder="Mevcut PIN"
-                    className="w-full py-2 px-3 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
+                    className="w-full py-2.5 px-3 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
                   />
                 </div>
 
@@ -377,7 +408,7 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
                     value={newPinInput}
                     onChange={e => setNewPinInput(e.target.value)}
                     placeholder="Yeni PIN (Örn: 2026)"
-                    className="w-full py-2 px-3 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
+                    className="w-full py-2.5 px-3 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
                   />
                 </div>
 
@@ -397,7 +428,7 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
 
                 <button
                   type="submit"
-                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all active:scale-95"
+                  className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all active:scale-95"
                 >
                   Yeni PIN'i Kaydet
                 </button>
@@ -410,10 +441,10 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
               {/* ============================================================ */}
               {activeTab === 'admin' && (
                 <div className="space-y-2.5">
-                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-200 flex items-start space-x-2">
+                  <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 flex items-start space-x-2">
                     <Lock className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                     <span>
-                      <strong>Konsey Girişi:</strong> Aşağıdan isminizi seçip 4 haneli PIN şifrenizi girerek yönetici moduna geçebilirsiniz.
+                      İsminize tıklayarak yönetici moduna geçebilirsiniz. Seçtiğinizde pencere <strong>otomatik olarak kapanacaktır</strong>.
                     </span>
                   </div>
 
@@ -425,7 +456,7 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
                           key={admin.id}
                           type="button"
                           onClick={() => handleSelectAdmin(admin)}
-                          className={`w-full p-3 rounded-xl border transition-all flex items-center justify-between text-left active:scale-[0.98] ${
+                          className={`w-full p-3.5 rounded-2xl border transition-all flex items-center justify-between text-left active:scale-[0.98] ${
                             isSelected
                               ? 'bg-amber-950/40 border-amber-500/60 shadow-md ring-1 ring-amber-500/40'
                               : 'bg-slate-950/70 border-slate-800 hover:border-slate-700 hover:bg-slate-850'
@@ -433,37 +464,37 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
                         >
                           <div className="flex items-center space-x-3">
                             <div
-                              className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs border ${
+                              className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs border ${
                                 isSelected
                                   ? 'bg-amber-500 text-black border-amber-400'
                                   : 'bg-slate-800 text-amber-300 border-slate-700'
                               }`}
                             >
-                              <Crown className="w-4 h-4 text-amber-400" />
+                              <Crown className="w-5 h-5 text-amber-400" />
                             </div>
                             <div>
-                              <div className="flex items-center space-x-1.5">
-                                <span className="font-bold text-xs text-white">{admin.name}</span>
+                              <div className="flex items-center space-x-2">
+                                <span className="font-black text-sm text-white">{admin.name}</span>
                                 {admin.id === 'eval_hadi' && (
                                   <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
                                     Konsey Başkanı
                                   </span>
                                 )}
                               </div>
-                              <span className="text-[10px] text-slate-400 flex items-center space-x-1">
+                              <span className="text-[11px] text-slate-400 flex items-center space-x-1 mt-0.5">
                                 <Lock className="w-3 h-3 text-amber-400/80" />
-                                <span>PIN Korumalı Giriş</span>
+                                <span>PIN Korumalı Yönetici</span>
                               </span>
                             </div>
                           </div>
 
                           {isSelected ? (
-                            <div className="w-6 h-6 rounded-full bg-amber-500 text-black flex items-center justify-center">
-                              <Check className="w-3.5 h-3.5 stroke-[3]" />
+                            <div className="w-7 h-7 rounded-full bg-amber-500 text-black flex items-center justify-center">
+                              <Check className="w-4 h-4 stroke-[3]" />
                             </div>
                           ) : (
-                            <span className="text-[11px] font-bold text-amber-400/90 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-                              Giriş Yap 🔒
+                            <span className="text-xs font-bold text-amber-400/90 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
+                              Seç ve Gir →
                             </span>
                           )}
                         </button>
@@ -476,7 +507,7 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setShowChangePin(true)}
-                        className="text-[11px] text-amber-400 hover:text-amber-300 font-bold flex items-center space-x-1 px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20"
+                        className="text-[11px] text-amber-400 hover:text-amber-300 font-bold flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20"
                       >
                         <KeyRound className="w-3.5 h-3.5" />
                         <span>Konsey PIN Şifresini Değiştir</span>
@@ -490,11 +521,11 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
               {/* TAB 2 CONTENT: GUEST / PLAYER SELECTION                      */}
               {/* ============================================================ */}
               {activeTab === 'guest' && (
-                <div className="space-y-2.5">
-                  <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-200 flex items-start space-x-2">
+                <div className="space-y-3">
+                  <div className="p-3 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-200 flex items-start space-x-2">
                     <Eye className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
                     <span>
-                      <strong>Oyuncu Modu:</strong> İsminizi seçerek maça <strong>[Geliyorum / Gelmiyorum]</strong> teyidinizi verebilir ve kadroyu inceleyebilirsiniz.
+                      İsminizi seçtiğinizde profiliniz anında aktifleşir ve bu pencere <strong>otomatik olarak kapanır</strong>.
                     </span>
                   </div>
 
@@ -502,40 +533,42 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
                   <button
                     type="button"
                     onClick={handleSelectGeneralGuest}
-                    className={`w-full p-2.5 rounded-xl border transition-all flex items-center justify-between text-left active:scale-[0.98] ${
+                    className={`w-full p-3 rounded-2xl border transition-all flex items-center justify-between text-left active:scale-[0.98] ${
                       currentUser.id === DEFAULT_GUEST_USER.id
                         ? 'bg-blue-950/40 border-blue-500/60 shadow-md ring-1 ring-blue-500/40'
                         : 'bg-slate-950/70 border-slate-800 hover:border-slate-700'
                     }`}
                   >
-                    <div className="flex items-center space-x-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-400 flex items-center justify-center">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-9 h-9 rounded-xl bg-blue-500/20 border border-blue-500/30 text-blue-400 flex items-center justify-center">
                         <Eye className="w-4 h-4" />
                       </div>
                       <div>
-                        <span className="font-bold text-xs text-white">Genel Misafir / İzleyici</span>
-                        <span className="text-[10px] text-slate-400 block">Sadece kadro ve maçları incele</span>
+                        <span className="font-bold text-xs sm:text-sm text-white">Genel Misafir / İzleyici</span>
+                        <span className="text-[11px] text-slate-400 block">Sadece kadro ve maçları incele</span>
                       </div>
                     </div>
-                    {currentUser.id === DEFAULT_GUEST_USER.id && (
-                      <Check className="w-4 h-4 text-blue-400 stroke-[3]" />
+                    {currentUser.id === DEFAULT_GUEST_USER.id ? (
+                      <Check className="w-5 h-5 text-blue-400 stroke-[3]" />
+                    ) : (
+                      <span className="text-xs text-slate-400 font-semibold">Seç →</span>
                     )}
                   </button>
 
                   {/* Search Player to Login as */}
                   <div className="relative">
-                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                       type="text"
                       placeholder="İsminizi arayın (Talha, Sidar, Ömer...)"
                       value={playerSearch}
                       onChange={e => setPlayerSearch(e.target.value)}
-                      className="w-full pl-8 pr-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                      className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                     />
                   </div>
 
-                  {/* Player List */}
-                  <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
+                  {/* Player List (Comfortable Height) */}
+                  <div className="space-y-1.5 max-h-64 sm:max-h-72 overflow-y-auto pr-1">
                     {guestCandidates.map(p => {
                       const isSelected = currentUser.playerId === p.id;
                       return (
@@ -543,30 +576,30 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
                           key={p.id}
                           type="button"
                           onClick={() => handleSelectPlayerGuest(p)}
-                          className={`w-full p-2 rounded-xl border transition-all flex items-center justify-between text-left text-xs active:scale-[0.98] ${
+                          className={`w-full p-2.5 rounded-xl border transition-all flex items-center justify-between text-left text-xs active:scale-[0.98] ${
                             isSelected
-                              ? 'bg-blue-950/40 border-blue-500/60 shadow-sm'
+                              ? 'bg-blue-950/40 border-blue-500/60 shadow-sm ring-1 ring-blue-500/40'
                               : 'bg-slate-950/50 border-slate-800/80 hover:border-slate-700'
                           }`}
                         >
-                          <div className="flex items-center space-x-2">
-                            <div className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 flex items-center justify-center font-bold text-[11px]">
+                          <div className="flex items-center space-x-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 flex items-center justify-center font-black text-xs">
                               {p.name.charAt(0)}
                             </div>
                             <div>
-                              <span className="font-bold text-white block">{p.name}</span>
-                              <span className="text-[10px] text-slate-400">
+                              <span className="font-bold text-white text-xs sm:text-sm block">{p.name}</span>
+                              <span className="text-[11px] text-slate-400">
                                 {p.primaryPosition} • Kayıtlı Oyuncu
                               </span>
                             </div>
                           </div>
 
                           {isSelected ? (
-                            <span className="text-[10px] px-2 py-0.5 rounded bg-blue-500 text-white font-bold">
+                            <span className="text-[11px] px-2.5 py-1 rounded-lg bg-blue-500 text-white font-bold">
                               Aktif Oyuncu
                             </span>
                           ) : (
-                            <span className="text-[10px] text-slate-500 font-semibold">Giriş Yap →</span>
+                            <span className="text-xs text-slate-400 font-semibold hover:text-white">Seç ve Kapat →</span>
                           )}
                         </button>
                       );
