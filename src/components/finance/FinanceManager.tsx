@@ -82,12 +82,12 @@ export const FinanceManager: React.FC = () => {
 
   // Generate Debt text for WhatsApp
   const generateDebtText = () => {
-    const unpaidPlayers = currentMatch.squad
-      .filter(id => !currentMatch.payments[id]?.isPaid)
+    const unpaidPlayers = activeMatch.squad
+      .filter(id => !activeMatch.payments[id]?.isPaid)
       .map(id => playersMap[id])
       .filter(Boolean);
 
-    let text = `⚽ *HALI SAHA ${currentMatch.matchNumber}. HAFTA ÖDEME HATIRLATMASI* ⚽\n`;
+    let text = `⚽ *HALI SAHA ${activeMatch.matchNumber}. HAFTA ÖDEME HATIRLATMASI* ⚽\n`;
     text += `Değerli arkadaşlar, saha ücretinin kapatılması için ödemesi beklenen üyelerimiz:\n\n`;
 
     if (unpaidPlayers.length > 0) {
@@ -124,7 +124,7 @@ export const FinanceManager: React.FC = () => {
 
   // Direct individual WhatsApp payment reminder
   const handleSendPlayerPersonalDebtWhatsApp = (player: Player) => {
-    const text = `Selam ${player.name}, ${currentMatch.venueName} halı saha maç ücreti payın ${costPerPlayer} ₺.\n🏦 IBAN: ${iban}\n👤 Alıcı: ${receiverName}\n📝 Açıklama: ${player.name} Halısaha\nMüsait olduğunda gönderebilirsen çok sevinirim, teşekkürler! 🤝⚽`;
+    const text = `Selam ${player.name}, ${activeMatch.venueName} halı saha maç ücreti payın ${costPerPlayer} ₺.\n🏦 IBAN: ${iban}\n👤 Alıcı: ${receiverName}\n📝 Açıklama: ${player.name} Halısaha\nMüsait olduğunda gönderebilirsen çok sevinirim, teşekkürler! 🤝⚽`;
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
   };
 
@@ -147,6 +147,28 @@ export const FinanceManager: React.FC = () => {
 
       {/* Financial Overview Card */}
       <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/40 border border-slate-700/60 shadow-xl space-y-4">
+        {/* Match Selector Dropdown (Allows toggling between Active Match and Past Matches) */}
+        <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+          <span className="text-[11px] font-bold text-slate-400 flex items-center space-x-1.5">
+            <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Kasa İnceleme Haftası:</span>
+          </span>
+          <select
+            value={selectedMatchId}
+            onChange={e => setSelectedMatchId(e.target.value)}
+            className="bg-slate-950 border border-slate-800 text-xs text-white rounded-xl px-2.5 py-1 focus:outline-none focus:border-emerald-500 font-bold"
+          >
+            <option value={currentMatch.id}>
+              ⚽ {currentMatch.matchNumber}. Hafta (Aktif Maç - {currentMatch.date})
+            </option>
+            {pastMatches.map(m => (
+              <option key={m.id} value={m.id}>
+                🗓️ {m.matchNumber}. Hafta (Geçmiş - {m.date})
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
             <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
@@ -154,7 +176,9 @@ export const FinanceManager: React.FC = () => {
             </div>
             <div>
               <h2 className="text-base font-black text-white">Maç Kasa & Bütçe Takibi</h2>
-              <p className="text-xs text-slate-400">{currentMatch.matchNumber}. Hafta Masraf & Tahsilat</p>
+              <p className="text-xs text-slate-400">
+                {activeMatch.matchNumber}. Hafta Masraf & Tahsilat ({activeMatch.date})
+              </p>
             </div>
           </div>
 
@@ -265,15 +289,15 @@ export const FinanceManager: React.FC = () => {
       {/* Squad Payment Toggles */}
       <div className="space-y-2">
         <div className="flex items-center justify-between text-xs text-slate-300 px-1">
-          <h3 className="font-bold">Bu Haftanın Oyuncu Ödemeleri</h3>
+          <h3 className="font-bold">{activeMatch.matchNumber}. Hafta Oyuncu Ödemeleri</h3>
           <span className="text-slate-400">Tek dokunuşla işaretleyin</span>
         </div>
 
         <div className="space-y-1.5">
-          {currentMatch.squad.map(playerId => {
+          {activeMatch.squad.map(playerId => {
             const player = playersMap[playerId];
             if (!player) return null;
-            const payment = currentMatch.payments[playerId] || { isPaid: false, amount: costPerPlayer };
+            const payment = activeMatch.payments[playerId] || { isPaid: false, amount: costPerPlayer };
 
             return (
               <div
