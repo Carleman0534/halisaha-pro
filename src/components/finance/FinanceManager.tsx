@@ -8,7 +8,13 @@ import {
   User,
   QrCode,
   Share2,
+  Edit3,
+  ExternalLink,
+  MessageCircle,
+  Building2,
+  X,
 } from 'lucide-react';
+import confetti from 'canvas-confetti';
 import { useApp } from '../../context/AppContext';
 import { Player } from '../../types';
 import { QrPaymentModal } from './QrPaymentModal';
@@ -21,6 +27,18 @@ export const FinanceManager: React.FC = () => {
 
   const [selectedPlayerForQr, setSelectedPlayerForQr] = useState<Player | null>(null);
   const [showGeneralQr, setShowGeneralQr] = useState(false);
+  const [showEditBankModal, setShowEditBankModal] = useState(false);
+
+  // Bank & IBAN details (persisted in localStorage)
+  const [iban, setIban] = useState<string>(() => {
+    return localStorage.getItem('halisaha_iban') || 'TR33 0006 1005 1234 5678 9012 34';
+  });
+  const [receiverName, setReceiverName] = useState<string>(() => {
+    return localStorage.getItem('halisaha_receiver') || 'Hadi Hoca';
+  });
+
+  const [editIbanValue, setEditIbanValue] = useState(iban);
+  const [editReceiverValue, setEditReceiverValue] = useState(receiverName);
 
   // Financial calculations
   const totalCost = currentMatch.totalPitchCost;
@@ -29,22 +47,30 @@ export const FinanceManager: React.FC = () => {
   const paidCount = currentMatch.squad.filter(id => currentMatch.payments[id]?.isPaid).length;
   const totalCollected = paidCount * costPerPlayer;
   const remainingDebt = Math.max(0, totalCost - totalCollected);
-  const progressPercent = Math.min(100, Math.round((totalCollected / totalCost) * 100));
+  const progressPercent = Math.min(100, Math.round((totalCollected / (totalCost || 1)) * 100));
 
-  const sampleIban = 'TR33 0006 1005 1234 5678 9012 34';
-  const receiverName = 'Hadi Hoca';
+  // Save updated IBAN
+  const handleSaveBankDetails = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIban(editIbanValue.trim());
+    setReceiverName(editReceiverValue.trim());
+    localStorage.setItem('halisaha_iban', editIbanValue.trim());
+    localStorage.setItem('halisaha_receiver', editReceiverValue.trim());
+    setShowEditBankModal(false);
+    confetti({ particleCount: 25, spread: 50, origin: { y: 0.7 } });
+  };
 
   // Copy standard IBAN
   const handleCopyIban = () => {
     navigator.clipboard.writeText(
-      `⚽ HALI SAHA MAÇ ÖDEMESİ\n💰 Kişi Başı: ${costPerPlayer} ₺\n🏦 IBAN: ${sampleIban}\n👤 Alıcı: ${receiverName}\n📝 Açıklama: Ad Soyad Halısaha`
+      `⚽ HALI SAHA MAÇ ÖDEMESİ\n💰 Kişi Başı: ${costPerPlayer} ₺\n🏦 IBAN: ${iban}\n👤 Alıcı: ${receiverName}\n📝 Açıklama: [Ad Soyad] Halısaha`
     );
     setCopiedIbanToast(true);
     setTimeout(() => setCopiedIbanToast(false), 2500);
   };
 
-  // WhatsApp Debt Reminder Broadcast
-  const handleCopyDebtBroadcast = () => {
+  // Generate Debt text for WhatsApp
+  const generateDebtText = () => {
     const unpaidPlayers = currentMatch.squad
       .filter(id => !currentMatch.payments[id]?.isPaid)
       .map(id => playersMap[id])
@@ -63,14 +89,32 @@ export const FinanceManager: React.FC = () => {
     }
 
     text += `\n💰 *Kalan Toplam:* ${remainingDebt} ₺\n`;
-    text += `🏦 *IBAN:* ${sampleIban}\n`;
+    text += `🏦 *IBAN:* ${iban}\n`;
     text += `👤 *Alıcı:* ${receiverName}\n`;
     text += `📝 *Açıklama:* Ad Soyad Halısaha\n\n`;
     text += `Ödeme yapan arkadaşlar dekontu gruba iletirse listeyi güncelleriz. Anlayışınız için teşekkürler! 🤝`;
 
+    return text;
+  };
+
+  // Copy Debt broadcast text
+  const handleCopyDebtBroadcast = () => {
+    const text = generateDebtText();
     navigator.clipboard.writeText(text);
     setCopiedDebtToast(true);
     setTimeout(() => setCopiedDebtToast(false), 3000);
+  };
+
+  // Direct open WhatsApp with Debt broadcast
+  const handleOpenDebtWhatsApp = () => {
+    const text = generateDebtText();
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
+  // Direct individual WhatsApp payment reminder
+  const handleSendPlayerPersonalDebtWhatsApp = (player: Player) => {
+    const text = `Selam ${player.name}, ${currentMatch.venueName} halı saha maç ücreti payın ${costPerPlayer} ₺.\n🏦 IBAN: ${iban}\n👤 Alıcı: ${receiverName}\n📝 Açıklama: ${player.name} Halısaha\nMüsait olduğunda gönderebilirsen çok sevinirim, teşekkürler! 🤝⚽`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
   };
 
   return (
@@ -91,19 +135,30 @@ export const FinanceManager: React.FC = () => {
       )}
 
       {/* Financial Overview Card */}
-      <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-700/60 shadow-xl space-y-4">
+      <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/40 border border-slate-700/60 shadow-xl space-y-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2.5">
             <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
               <Wallet className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-black text-white">Maç Kasa Özeti</h2>
+              <h2 className="text-base font-black text-white">Maç Kasa & Bütçe Takibi</h2>
               <p className="text-xs text-slate-400">{currentMatch.matchNumber}. Hafta Masraf & Tahsilat</p>
             </div>
           </div>
 
           <div className="flex items-center space-x-1.5">
+            <button
+              onClick={() => {
+                setEditIbanValue(iban);
+                setEditReceiverValue(receiverName);
+                setShowEditBankModal(true);
+              }}
+              title="IBAN / Hesap Bilgilerini Düzenle"
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-amber-400 transition-all active:scale-95"
+            >
+              <Edit3 className="w-4 h-4" />
+            </button>
             <button
               onClick={() => setShowGeneralQr(true)}
               title="Karekod ile Ödeme Aç"
@@ -119,6 +174,24 @@ export const FinanceManager: React.FC = () => {
               <Copy className="w-4 h-4" />
             </button>
           </div>
+        </div>
+
+        {/* Bank & IBAN Quick Info Pill */}
+        <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between text-xs">
+          <div className="flex items-center space-x-2">
+            <Building2 className="w-4 h-4 text-emerald-400" />
+            <div>
+              <span className="text-[10px] text-slate-400 block">Kasa Alıcısı: {receiverName}</span>
+              <span className="font-mono text-slate-200 font-bold text-[11px] select-all">{iban}</span>
+            </div>
+          </div>
+
+          <button
+            onClick={handleCopyIban}
+            className="px-2 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 rounded-lg text-[10px] font-bold"
+          >
+            Kopyala
+          </button>
         </div>
 
         {/* 3 Metrics Grid */}
@@ -158,22 +231,22 @@ export const FinanceManager: React.FC = () => {
           </div>
         </div>
 
-        {/* Top Action: WhatsApp Debt List Broadcast Button */}
+        {/* Action Buttons: WhatsApp Debt Broadcast */}
         <div className="grid grid-cols-2 gap-2 pt-1">
           <button
-            onClick={() => setShowGeneralQr(true)}
+            onClick={handleCopyDebtBroadcast}
             className="flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold text-xs transition-all active:scale-95"
           >
-            <QrCode className="w-4 h-4 text-emerald-400" />
-            <span>Karekod ile Öde</span>
+            <Copy className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Metni Kopyala</span>
           </button>
 
           <button
-            onClick={handleCopyDebtBroadcast}
+            onClick={handleOpenDebtWhatsApp}
             className="flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 transition-all active:scale-95"
           >
-            <Share2 className="w-4 h-4" />
-            <span>Borç Listesi (WP)</span>
+            <Share2 className="w-3.5 h-3.5" />
+            <span>Gruba Hatırlat (WP)</span>
           </button>
         </div>
       </div>
@@ -215,7 +288,7 @@ export const FinanceManager: React.FC = () => {
                     <span className="text-xs text-slate-400 font-mono">
                       Pay: {costPerPlayer} ₺ •{' '}
                       {payment.isPaid ? (
-                        <span className="text-emerald-400 font-semibold">Ödendi</span>
+                        <span className="text-emerald-400 font-semibold">Ödendi ✓</span>
                       ) : (
                         <span className="text-rose-400 font-semibold">Ödeme Bekliyor</span>
                       )}
@@ -223,8 +296,18 @@ export const FinanceManager: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Right Buttons: Personal QR Code & Toggle */}
+                {/* Right Buttons: Individual WhatsApp Ping, Personal QR, & Toggle */}
                 <div className="flex items-center space-x-1.5" onClick={e => e.stopPropagation()}>
+                  {!payment.isPaid && (
+                    <button
+                      onClick={() => handleSendPlayerPersonalDebtWhatsApp(player)}
+                      title={`${player.name}'e WhatsApp'tan Özel Ödeme Hatırlatması Gönder`}
+                      className="p-2 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 text-xs transition-all active:scale-95"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                    </button>
+                  )}
+
                   <button
                     onClick={() => setSelectedPlayerForQr(player)}
                     title={`${player.name} için Banka Karekodu Aç`}
@@ -288,6 +371,77 @@ export const FinanceManager: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* EDIT BANK & IBAN MODAL */}
+      {showEditBankModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center">
+                  <Building2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-sm">Banka & IBAN Bilgileri</h3>
+                  <p className="text-[10px] text-slate-400">Gruba gidecek ödeme hesap detayları</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowEditBankModal(false)}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveBankDetails} className="space-y-3">
+              <div>
+                <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                  Alıcı Adı Soyadı (Hesap Sahibi)
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editReceiverValue}
+                  onChange={e => setEditReceiverValue(e.target.value)}
+                  placeholder="Örn: Hadi Alizadeh"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                  IBAN Numarası
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editIbanValue}
+                  onChange={e => setEditIbanValue(e.target.value)}
+                  placeholder="TR00 0000 0000 0000 0000 0000 00"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="pt-2 flex space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEditBankModal(false)}
+                  className="flex-1 py-2 rounded-xl bg-slate-800 text-slate-300 font-semibold text-xs"
+                >
+                  İptal
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30"
+                >
+                  Kaydet
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* QR CODE PAYMENT MODALS */}
       {showGeneralQr && (

@@ -63,6 +63,8 @@ interface AppContextType {
   assignPlayerToTeam: (playerId: string, team: 'teamA' | 'teamB' | 'bench', position?: Position) => void;
   updatePlayerPositionInTeam: (playerId: string, team: 'teamA' | 'teamB', newPosition: Position) => void;
   setTeamFormation: (team: 'teamA' | 'teamB', formation: string) => void;
+  applyPenalty: (playerId: string, points: number, reason?: string) => void;
+  clearPenalties: (playerId: string) => void;
   firebaseActive: boolean;
   refreshFirebaseStatus: () => void;
 }
@@ -601,6 +603,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveMatchToDatabase(nextMatch);
   };
 
+  // Apply penalty points to player
+  const applyPenalty = (playerId: string, points: number, reason?: string) => {
+    setPlayers(prev => {
+      const next = prev.map(p => {
+        if (p.id !== playerId) return p;
+        const newPenalty = Math.max(0, p.attendanceStats.penaltyPoints + points);
+        const updated = recalculatePlayerStats({
+          ...p,
+          attendanceStats: {
+            ...p.attendanceStats,
+            penaltyPoints: newPenalty,
+            isSuspended: newPenalty >= 30,
+          },
+        });
+        savePlayerToDatabase(updated);
+        return updated;
+      });
+      saveLocalPlayers(next);
+      return next;
+    });
+  };
+
+  // Clear all penalty points for player
+  const clearPenalties = (playerId: string) => {
+    setPlayers(prev => {
+      const next = prev.map(p => {
+        if (p.id !== playerId) return p;
+        const updated = recalculatePlayerStats({
+          ...p,
+          attendanceStats: {
+            ...p.attendanceStats,
+            penaltyPoints: 0,
+            isSuspended: false,
+          },
+        });
+        savePlayerToDatabase(updated);
+        return updated;
+      });
+      saveLocalPlayers(next);
+      return next;
+    });
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -624,6 +669,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         assignPlayerToTeam,
         updatePlayerPositionInTeam,
         setTeamFormation,
+        applyPenalty,
+        clearPenalties,
         firebaseActive,
         refreshFirebaseStatus,
       }}

@@ -10,24 +10,35 @@ import {
 } from 'lucide-react';
 import { COUNCIL_RULES, CRITERIA_RUBRICS, POSITION_WEIGHTS } from '../../data/initialData';
 import { Position } from '../../types';
+import { DisciplineManagerModal } from './DisciplineManagerModal';
 
 export const CouncilRules: React.FC = () => {
   const [openRuleId, setOpenRuleId] = useState<number | null>(1);
   const [selectedRubricKey, setSelectedRubricKey] = useState<string>('pas');
   const [selectedPosition, setSelectedPosition] = useState<Position>('Orta saha');
+  const [showDisciplineModal, setShowDisciplineModal] = useState<boolean>(false);
 
   const selectedRubric = CRITERIA_RUBRICS.find(r => r.key === selectedRubricKey) || CRITERIA_RUBRICS[0];
 
   return (
     <div className="space-y-5 pb-20">
-      {/* Announcements Banner */}
-      <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/80 to-slate-900 border border-emerald-500/30 space-y-1.5 shadow-xl">
-        <div className="flex items-center space-x-2 text-emerald-400 font-bold text-xs uppercase tracking-wide">
-          <Megaphone className="w-4 h-4" />
-          <span>Resmi Konsey Bildirisi</span>
+      {/* Announcements Banner & Quick Action */}
+      <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/80 via-slate-900 to-rose-950/40 border border-emerald-500/30 space-y-3 shadow-xl">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2 text-emerald-400 font-bold text-xs uppercase tracking-wide">
+            <Megaphone className="w-4 h-4" />
+            <span>Resmi Konsey Bildirisi</span>
+          </div>
+          <button
+            onClick={() => setShowDisciplineModal(true)}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-xs font-bold transition-all active:scale-95"
+          >
+            <AlertCircle className="w-3.5 h-3.5" />
+            <span>Disiplin & Cezalar</span>
+          </button>
         </div>
         <p className="text-xs text-slate-200 leading-relaxed">
-          Tüm üyelerin maç başlangıç saatinden en az 15 dakika önce sahada olması esastır. İptaller en geç maçtan 24 saat önce bildirilmelidir; aksi takdirde sistem tarafından 1 ceza puanı yazılır.
+          Tüm üyelerin maç başlangıç saatinden en az 15 dakika önce sahada olması esastır. İptaller en geç maçtan 24 saat önce bildirilmelidir; aksi takdirde sistem tarafından ceza puanı uygulanır.
         </p>
       </div>
 
@@ -182,6 +193,10 @@ export const CouncilRules: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {showDisciplineModal && (
+        <DisciplineManagerModal onClose={() => setShowDisciplineModal(false)} />
+      )}
     </div>
   );
 };

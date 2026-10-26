@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Wand2,
   Share2,
@@ -12,7 +12,11 @@ import {
   UserCheck,
   RotateCcw,
   RefreshCw,
+  Camera,
+  Download,
+  Image as ImageIcon,
 } from 'lucide-react';
+import { toPng } from 'html-to-image';
 import confetti from 'canvas-confetti';
 import { useApp } from '../../context/AppContext';
 import { generateWhatsAppShareText } from '../../utils/calculations';
@@ -90,6 +94,52 @@ export const SquadManager: React.FC = () => {
     navigator.clipboard.writeText(text);
     setCopiedToast(true);
     setTimeout(() => setCopiedToast(false), 3000);
+  };
+
+  const [isExportingImage, setIsExportingImage] = useState(false);
+  const pitchContainerRef = useRef<HTMLDivElement>(null);
+
+  // Export tactical field as PNG image and share/download
+  const handleExportSquadImage = async () => {
+    if (!pitchContainerRef.current) return;
+    setIsExportingImage(true);
+    try {
+      const dataUrl = await toPng(pitchContainerRef.current, {
+        cacheBust: true,
+        pixelRatio: 2,
+        backgroundColor: '#020617',
+      });
+
+      // Try native Web Share API with image file for mobile WhatsApp sharing
+      try {
+        const res = await fetch(dataUrl);
+        const blob = await res.blob();
+        const file = new File([blob], `halisaha-kadro-${currentMatch.date}.png`, { type: 'image/png' });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            title: `⚽ Halı Saha Kadro Dizilimi (${currentFormat})`,
+            text: `⚽ *${currentMatch.venueName} | ${currentMatch.time}*\nKırmızı Takım vs Mavi Takım Kadro Dizilimi!`,
+            files: [file],
+          });
+          confetti({ particleCount: 35, spread: 60, origin: { y: 0.7 } });
+          return;
+        }
+      } catch (shareErr) {
+        console.log('Direct image share fallback to download:', shareErr);
+      }
+
+      // Download file fallback
+      const link = document.createElement('a');
+      link.download = `halisaha-kadro-${currentMatch.date}.png`;
+      link.href = dataUrl;
+      link.click();
+      confetti({ particleCount: 35, spread: 60, origin: { y: 0.7 } });
+    } catch (err) {
+      console.warn('Squad image export error:', err);
+    } finally {
+      setIsExportingImage(false);
+    }
   };
 
   // Toggle player selection in squad
@@ -253,7 +303,7 @@ export const SquadManager: React.FC = () => {
         </div>
 
         {/* Buttons */}
-        <div className="grid grid-cols-2 gap-2 pt-1">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
           <button
             onClick={handleAutoBalance}
             className="flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 transition-all active:scale-95"
@@ -266,7 +316,15 @@ export const SquadManager: React.FC = () => {
             className="flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 font-bold text-xs transition-all active:scale-95"
           >
             <Share2 className="w-4 h-4" />
-            <span>WhatsApp Paylaş</span>
+            <span>WhatsApp Metni</span>
+          </button>
+          <button
+            onClick={handleExportSquadImage}
+            disabled={isExportingImage}
+            className="flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-blue-600/20 transition-all active:scale-95"
+          >
+            <Camera className="w-4 h-4" />
+            <span>{isExportingImage ? 'Hazırlanıyor...' : '📸 Kadro Resmi (PNG)'}</span>
           </button>
         </div>
       </div>
@@ -359,7 +417,10 @@ export const SquadManager: React.FC = () => {
           )}
 
           {/* HALI SAHA TACTICAL FIELD */}
-          <div className="relative rounded-2xl overflow-hidden border-2 border-emerald-500/40 shadow-2xl pitch-bg p-3 min-h-[480px] flex flex-col justify-between">
+          <div
+            ref={pitchContainerRef}
+            className="relative rounded-2xl overflow-hidden border-2 border-emerald-500/40 shadow-2xl pitch-bg p-3 min-h-[480px] flex flex-col justify-between"
+          >
             {/* Field Lines */}
             <div className="absolute inset-0 pointer-events-none flex flex-col justify-center items-center">
               <div className="w-[96%] h-[96%] border border-white/20 rounded-xl flex flex-col justify-between items-center relative">

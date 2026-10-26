@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Sparkles,
   MessageCircle,
+  ShieldAlert,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Player, Position } from '../../types';
@@ -19,6 +20,7 @@ import { EvaluatorModal } from './EvaluatorModal';
 import { FifaCardModal } from './FifaCardModal';
 import { WhatsAppInviteModal } from '../common/WhatsAppInviteModal';
 import { QuickAddPlayerModal } from './QuickAddPlayerModal';
+import { DisciplineManagerModal } from '../council/DisciplineManagerModal';
 
 export const PlayerPool: React.FC = () => {
   const { players } = useApp();
@@ -31,6 +33,7 @@ export const PlayerPool: React.FC = () => {
   const [fifaCardPlayer, setFifaCardPlayer] = useState<Player | null>(null);
   const [invitePlayer, setInvitePlayer] = useState<Player | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showDisciplineModal, setShowDisciplineModal] = useState(false);
 
   // Filter players
   const filteredPlayers = players.filter(p => {
@@ -71,11 +74,20 @@ export const PlayerPool: React.FC = () => {
 
         <button
           onClick={() => setInvitePlayer(players[0] || null)}
-          className="flex items-center space-x-1 py-2 px-3 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all active:scale-95"
+          className="flex items-center space-x-1 py-2 px-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all active:scale-95"
           title="WhatsApp Maç Daveti Gönder"
         >
           <MessageCircle className="w-4 h-4 text-emerald-400" />
-          <span>Davet Et</span>
+          <span>Davet</span>
+        </button>
+
+        <button
+          onClick={() => setShowDisciplineModal(true)}
+          className="flex items-center space-x-1 py-2 px-2.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-xs font-bold transition-all active:scale-95"
+          title="Disiplin & Ceza Yönetimi"
+        >
+          <ShieldAlert className="w-4 h-4 text-rose-400" />
+          <span>Cezalar</span>
         </button>
 
         <button
@@ -235,6 +247,11 @@ export const PlayerPool: React.FC = () => {
       {/* QUICK & BATCH ADD PLAYER MODAL */}
       {showAddModal && (
         <QuickAddPlayerModal onClose={() => setShowAddModal(false)} />
+      )}
+
+      {/* DISCIPLINE & PENALTY MANAGER MODAL */}
+      {showDisciplineModal && (
+        <DisciplineManagerModal onClose={() => setShowDisciplineModal(false)} />
       )}
     </div>
   );

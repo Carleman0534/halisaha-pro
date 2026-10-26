@@ -19,6 +19,8 @@ import { useApp } from '../../context/AppContext';
 import { AttendanceStatus } from '../../types';
 
 import { EmergencySubstituteFinder } from './EmergencySubstituteFinder';
+import { MatchResultsModal } from './MatchResultsModal';
+import { AddToCalendarModal } from '../common/AddToCalendarModal';
 
 interface MatchPlannerProps {
   onNavigateToSquad: () => void;
@@ -29,12 +31,10 @@ export const MatchPlanner: React.FC<MatchPlannerProps> = ({ onNavigateToSquad })
     useApp();
 
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
-  const [showScoreModal, setShowScoreModal] = useState(false);
+  const [showResultsModal, setShowResultsModal] = useState(false);
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [showNewMatchModal, setShowNewMatchModal] = useState(false);
   const [showMvpModal, setShowMvpModal] = useState(false);
-
-  const [scoreA, setScoreA] = useState(currentMatch.teamA.score ?? 6);
-  const [scoreB, setScoreB] = useState(currentMatch.teamB.score ?? 5);
 
   const [newDate, setNewDate] = useState('2026-11-04');
   const [newTime, setNewTime] = useState('21:00 - 22:00');
@@ -46,28 +46,37 @@ export const MatchPlanner: React.FC<MatchPlannerProps> = ({ onNavigateToSquad })
       {/* 3 NUMARALI MODÜL: TARİH, TOPLAM GELEN SAYISI, HABER BEKLENENLER & ACİL ÇAĞRI */}
       <EmergencySubstituteFinder onNavigateToSquad={onNavigateToSquad} />
 
-      {/* Maç Sonu İşlemleri & Skor Girişi Çubuğu */}
+      {/* Maç Sonu İşlemleri & Takvim Çubuğu */}
       <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between">
         <div>
-          <span className="text-xs font-bold text-white block">Maç Oynandı mı?</span>
-          <span className="text-[10px] text-slate-400">Skoru girip maçı arşive kaydedin</span>
+          <span className="text-xs font-bold text-white block">Maç İşlemleri & Takvim</span>
+          <span className="text-[10px] text-slate-400">Skor, MVP ve takvim entegrasyonu</span>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1.5">
+          <button
+            onClick={() => setShowCalendarModal(true)}
+            className="flex items-center space-x-1 py-1.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold transition-all active:scale-95"
+            title="Google veya Apple Takvimine Ekle"
+          >
+            <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Takvim</span>
+          </button>
+
           <button
             onClick={() => setShowAttendanceModal(true)}
             className="flex items-center space-x-1 py-1.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold transition-all active:scale-95"
           >
             <CheckCircle2 className="w-3.5 h-3.5 text-amber-400" />
-            <span>Ceza Yoklaması</span>
+            <span>Yoklama</span>
           </button>
 
           <button
-            onClick={() => setShowScoreModal(true)}
+            onClick={() => setShowResultsModal(true)}
             className="flex items-center space-x-1 py-1.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-black shadow-md shadow-amber-500/20 transition-all active:scale-95"
           >
             <Trophy className="w-3.5 h-3.5" />
-            <span>Skor Gir</span>
+            <span>Skor & MVP</span>
           </button>
         </div>
       </div>
@@ -290,57 +299,17 @@ export const MatchPlanner: React.FC<MatchPlannerProps> = ({ onNavigateToSquad })
         </div>
       )}
 
-      {/* SCORE MODAL */}
-      {showScoreModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-5 shadow-2xl">
-            <h3 className="font-bold text-white text-base mb-1">Maç Skorunu Gir</h3>
-            <p className="text-xs text-slate-400 mb-4">Skor girildiğinde maç geçmişe kaydedilir.</p>
+      {/* MATCH RESULTS MODAL (SCORE + MVP + FAIR PLAY + WHATSAPP) */}
+      {showResultsModal && (
+        <MatchResultsModal onClose={() => setShowResultsModal(false)} />
+      )}
 
-            <div className="grid grid-cols-2 gap-4 text-center mb-6">
-              <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700">
-                <span className="text-xs font-bold text-rose-400">{currentMatch.teamA.name}</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="30"
-                  value={scoreA}
-                  onChange={e => setScoreA(parseInt(e.target.value) || 0)}
-                  className="w-full text-center text-3xl font-black font-mono bg-transparent text-white focus:outline-none mt-2"
-                />
-              </div>
-              <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700">
-                <span className="text-xs font-bold text-blue-400">{currentMatch.teamB.name}</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="30"
-                  value={scoreB}
-                  onChange={e => setScoreB(parseInt(e.target.value) || 0)}
-                  className="w-full text-center text-3xl font-black font-mono bg-transparent text-white focus:outline-none mt-2"
-                />
-              </div>
-            </div>
-
-            <div className="flex space-x-2">
-              <button
-                onClick={() => setShowScoreModal(false)}
-                className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs"
-              >
-                İptal
-              </button>
-              <button
-                onClick={() => {
-                  setMatchScores(scoreA, scoreB);
-                  setShowScoreModal(false);
-                }}
-                className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30"
-              >
-                Kaydet & Bitir
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* ADD TO CALENDAR MODAL */}
+      {showCalendarModal && (
+        <AddToCalendarModal
+          match={currentMatch}
+          onClose={() => setShowCalendarModal(false)}
+        />
       )}
 
       {/* NEW MATCH MODAL */}

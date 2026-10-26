@@ -26,6 +26,7 @@ import confetti from 'canvas-confetti';
 import { useApp } from '../../context/AppContext';
 import { Player, AttendanceStatus, Position } from '../../types';
 import { sendOneDayBeforeReminder } from '../../services/notifications';
+import { AddToCalendarModal } from '../common/AddToCalendarModal';
 
 interface EmergencySubstituteFinderProps {
   onNavigateToSquad?: () => void;
@@ -39,6 +40,7 @@ export const EmergencySubstituteFinder: React.FC<EmergencySubstituteFinderProps>
   const [activeFilter, setActiveFilter] = useState<'all' | 'geliyor' | 'bekleniyor' | 'gelemiyor'>('bekleniyor');
   const [searchQuery, setSearchQuery] = useState('');
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [copiedBroadcast, setCopiedBroadcast] = useState(false);
   const [selectedPositionFilter, setSelectedPositionFilter] = useState<string>('all');
 
@@ -418,22 +420,30 @@ ${gelenlerLines || '(Henüz kadro kesinleşmedi)'}
         </div>
 
         {/* Quick Action Buttons */}
-        <div className="grid grid-cols-2 gap-2 mt-3">
+        <div className="grid grid-cols-3 gap-2 mt-3">
           <button
             onClick={() => setShowBroadcastModal(true)}
-            className="flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 transition-all active:scale-95"
+            className="flex items-center justify-center space-x-1.5 py-2 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 transition-all active:scale-95"
           >
             <Share2 className="w-3.5 h-3.5" />
-            <span>WhatsApp Acil Çağrı</span>
+            <span>Acil Çağrı</span>
+          </button>
+
+          <button
+            onClick={() => setShowCalendarModal(true)}
+            className="flex items-center justify-center space-x-1.5 py-2 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-xs transition-all active:scale-95"
+          >
+            <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Takvim</span>
           </button>
 
           {onNavigateToSquad && (
             <button
               onClick={onNavigateToSquad}
-              className="flex items-center justify-center space-x-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-xs transition-all active:scale-95"
+              className="flex items-center justify-center space-x-1 py-2 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-xs transition-all active:scale-95"
             >
-              <span>Sahada Dizilimi Aç</span>
-              <ArrowRight className="w-3.5 h-3.5 ml-1" />
+              <span>Dizilim</span>
+              <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
             </button>
           )}
         </div>
@@ -827,6 +837,14 @@ ${gelenlerLines || '(Henüz kadro kesinleşmedi)'}
             </div>
           </div>
         </div>
+      )}
+
+      {/* 6. ADD TO CALENDAR MODAL */}
+      {showCalendarModal && (
+        <AddToCalendarModal
+          match={currentMatch}
+          onClose={() => setShowCalendarModal(false)}
+        />
       )}
     </div>
   );
