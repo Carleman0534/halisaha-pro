@@ -20,10 +20,12 @@ import {
   Flame,
   ArrowRight,
   ExternalLink,
+  BellRing,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useApp } from '../../context/AppContext';
 import { Player, AttendanceStatus, Position } from '../../types';
+import { sendOneDayBeforeReminder } from '../../services/notifications';
 
 interface EmergencySubstituteFinderProps {
   onNavigateToSquad?: () => void;
@@ -281,6 +283,57 @@ ${
     }
   };
 
+  const [oneDayNotifSent, setOneDayNotifSent] = useState(false);
+
+  const openOneDayPlayerWhatsApp = (player: Player) => {
+    try {
+      const d = new Date(currentMatch.date);
+      const day = d.toLocaleDateString('tr-TR', { weekday: 'long' });
+      const timeOnly = currentMatch.time.split('-')[0].trim();
+      const text = encodeURIComponent(
+        `Selam ${player.name}, yarın saat ${timeOnly}'de halı saha maçımız var, unutmadın değil mi? ⚽🔥\nSaha: ${currentMatch.venueName}\nÇantaları bu akşamdan hazırla, görüşürüz!`
+      );
+      window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+    } catch {
+      const text = encodeURIComponent(
+        `Selam ${player.name}, yarın saat ${currentMatch.time} halı saha maçımız var, unutmadın değil mi? ⚽🔥\nSaha: ${currentMatch.venueName}`
+      );
+      window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+    }
+  };
+
+  const handleSendOneDayBroadcast = () => {
+    const gelenlerLines = categorizedPlayers.geliyor
+      .map((p, idx) => `${idx + 1}. ${p.name} (${p.primaryPosition})`)
+      .join('\n');
+
+    const text = encodeURIComponent(`⏰ *YARIN MAÇ GÜNÜ! (SON TEYİT & HATIRLATMA)* ⏰
+📅 *Tarih:* Yarın (${dateFormatted}) | ${currentMatch.time}
+📍 *Saha:* ${currentMatch.venueName} (${currentMatch.pitchNo})
+👥 *Kadro:* ${comingCount}/${targetCount} Kişi Onayladı
+💰 *Kişi Başı Ücret:* ${currentMatch.costPerPlayer} ₺
+
+✅ *KESİNLEŞEN KADRO:*
+${gelenlerLines || '(Henüz kadro kesinleşmedi)'}
+
+⚠️ *ÖNEMLİ KURAL:* Son dakika iptalleri takımları eksik bırakır. Yarın gelemeyecek olanların BU AKŞAMDAN bildirmesi zorunludur! Herkes vaktinde sahada olsun. ⚽🔥`);
+
+    window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+  };
+
+  const handleSendOneDayPush = async () => {
+    try {
+      const d = new Date(currentMatch.date);
+      const day = d.toLocaleDateString('tr-TR', { weekday: 'long' });
+      await sendOneDayBeforeReminder(day, currentMatch.time, currentMatch.venueName);
+      setOneDayNotifSent(true);
+      confetti({ particleCount: 30, spread: 60, origin: { y: 0.8 } });
+      setTimeout(() => setOneDayNotifSent(false), 3000);
+    } catch (err) {
+      console.warn('One day before reminder error:', err);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* 1. TARİH, SAAT & GERİ SAYIM KARTI */}
@@ -383,6 +436,53 @@ ${
               <ArrowRight className="w-3.5 h-3.5 ml-1" />
             </button>
           )}
+        </div>
+      </div>
+
+      {/* 2. 1 GÜN ÖNCE MAÇ TEYİT & BİLDİRİM SİSTEMİ (H-24) */}
+      <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-950/40 via-slate-900 to-slate-900 border border-amber-500/30 space-y-3 shadow-lg">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center">
+              <BellRing className="w-4 h-4 animate-bounce" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-1.5">
+                <h3 className="text-xs font-black text-white uppercase tracking-wider">
+                  1 Gün Önce Maç Teyit & Bildirim (H-24)
+                </h3>
+                <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                  Otomatik & Manuel
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400">
+                Gelen {comingCount} oyuncuya teyit bildirimi gönder, son dakika iptallerini önle!
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+          <button
+            onClick={handleSendOneDayBroadcast}
+            className="flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all active:scale-95"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            <span>Yarınki Maçı Gruba Duyur (WhatsApp)</span>
+          </button>
+
+          <button
+            onClick={handleSendOneDayPush}
+            disabled={oneDayNotifSent}
+            className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl font-bold text-xs transition-all active:scale-95 border ${
+              oneDayNotifSent
+                ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                : 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-300 shadow-sm'
+            }`}
+          >
+            <BellRing className="w-3.5 h-3.5" />
+            <span>{oneDayNotifSent ? 'Bildirim Gönderildi!' : 'Telefonlara Bildirim Gönder (Push)'}</span>
+          </button>
         </div>
       </div>
 
@@ -611,6 +711,17 @@ ${
                         className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs transition-all active:scale-95"
                       >
                         <MessageCircle className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+
+                    {/* 1 Day Before Reminder Ping if Confirmed */}
+                    {isComing && (
+                      <button
+                        onClick={() => openOneDayPlayerWhatsApp(p)}
+                        title="Yarınki Maçı Hatırlat (WhatsApp Teyit)"
+                        className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 text-xs transition-all active:scale-95"
+                      >
+                        <BellRing className="w-3.5 h-3.5" />
                       </button>
                     )}
 

@@ -115,3 +115,15 @@ export async function sendPaymentReminderNotification(costPerPlayer: number): Pr
     tag: 'halisaha-payment',
   });
 }
+
+export async function sendOneDayBeforeReminder(
+  dayName: string,
+  timeStr: string,
+  venue: string
+): Promise<boolean> {
+  return sendSystemNotification({
+    title: `⏰ YARIN MAÇ GÜNÜ! (${dayName} ${timeStr})`,
+    body: `Yarın ${timeStr} saatinde ${venue} sahasında maçınız var! Kadroda yeriniz ayrıldı, çantaları bu akşamdan hazırlayın.`,
+    tag: 'halisaha-one-day-before',
+  });
+}

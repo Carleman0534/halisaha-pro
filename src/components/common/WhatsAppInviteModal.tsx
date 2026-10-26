@@ -25,7 +25,7 @@ export const WhatsAppInviteModal: React.FC<WhatsAppInviteModalProps> = ({ player
   const { currentMatch, players } = useApp();
 
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>(player?.id || players[0]?.id || '');
-  const [templateType, setTemplateType] = useState<'short' | 'detailed' | 'urgent'>('short');
+  const [templateType, setTemplateType] = useState<'short' | 'oneday' | 'detailed' | 'urgent'>('oneday');
   const [customMessage, setCustomMessage] = useState<string>('');
   const [copied, setCopied] = useState(false);
 
@@ -50,6 +50,11 @@ export const WhatsAppInviteModal: React.FC<WhatsAppInviteModalProps> = ({ player
   const generatedText = useMemo(() => {
     const name = activePlayer ? activePlayer.name : 'dostum';
     const pos = activePlayer ? activePlayer.primaryPosition : 'oyuncu';
+
+    if (templateType === 'oneday') {
+      return `Selam ${name}, yarın saat ${timeOnly}'de halı saha maçımız var, unutmadın değil mi? Çantaları bu akşamdan hazırla, görüşürüz! ⚽🔥
+📍 Saha: ${currentMatch.venueName} (${currentMatch.pitchNo})`;
+    }
 
     if (templateType === 'short') {
       // EXACT format requested: "... günü ... saatinde maçımız var gelmek istermisin"
@@ -125,13 +130,27 @@ Saha: ${currentMatch.venueName}`;
         {/* Template Style Selector */}
         <div>
           <label className="text-[11px] font-semibold text-slate-300 block mb-1.5">Mesaj Şablonu:</label>
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+            <button
+              onClick={() => {
+                setTemplateType('oneday');
+                setCustomMessage('');
+              }}
+              className={`py-2 px-1 rounded-xl text-center text-xs font-bold transition-all border ${
+                templateType === 'oneday'
+                  ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md'
+                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+              }`}
+            >
+              ⏰ 1 Gün Kala
+            </button>
+
             <button
               onClick={() => {
                 setTemplateType('short');
                 setCustomMessage('');
               }}
-              className={`py-2 px-1.5 rounded-xl text-center text-xs font-bold transition-all border ${
+              className={`py-2 px-1 rounded-xl text-center text-xs font-bold transition-all border ${
                 templateType === 'short'
                   ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-md'
                   : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
@@ -145,7 +164,7 @@ Saha: ${currentMatch.venueName}`;
                 setTemplateType('detailed');
                 setCustomMessage('');
               }}
-              className={`py-2 px-1.5 rounded-xl text-center text-xs font-bold transition-all border ${
+              className={`py-2 px-1 rounded-xl text-center text-xs font-bold transition-all border ${
                 templateType === 'detailed'
                   ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-md'
                   : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
@@ -159,7 +178,7 @@ Saha: ${currentMatch.venueName}`;
                 setTemplateType('urgent');
                 setCustomMessage('');
               }}
-              className={`py-2 px-1.5 rounded-xl text-center text-xs font-bold transition-all border ${
+              className={`py-2 px-1 rounded-xl text-center text-xs font-bold transition-all border ${
                 templateType === 'urgent'
                   ? 'bg-rose-500 text-white border-rose-400 shadow-md'
                   : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
