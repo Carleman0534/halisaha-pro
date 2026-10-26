@@ -126,7 +126,7 @@ export const PlayerPool: React.FC = () => {
         <span>Sıralama: Nihai Güç Puanı</span>
       </div>
 
-      <div className="space-y-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
         {filteredPlayers
           .sort((a, b) => b.finalScore - a.finalScore)
           .map(player => (

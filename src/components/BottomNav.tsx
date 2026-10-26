@@ -36,7 +36,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab })
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-30 bg-slate-900/95 backdrop-blur-lg border-t border-slate-800 pb-safe">
-      <div className="max-w-md mx-auto grid grid-cols-5 h-16">
+      <div className="w-full max-w-2xl lg:max-w-3xl mx-auto grid grid-cols-5 h-16 px-2 sm:px-4">
         {tabs.map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -61,9 +61,9 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab })
                   </span>
                 )}
               </div>
-              <span className="text-[11px] tracking-tight">{tab.label}</span>
+              <span className="text-[11px] sm:text-xs tracking-tight">{tab.label}</span>
               {isActive && (
-                <span className="absolute bottom-1 w-6 h-0.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50" />
+                <span className="absolute bottom-1 w-8 sm:w-10 h-0.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50" />
               )}
             </button>
           );
