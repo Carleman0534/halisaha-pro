@@ -134,6 +134,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // User identity: Admin (Council: Hadi, Yasin, Muhammed, Serkan, Fatih) or Guest (Other players / visitors)
   const [currentUser, setCurrentUser] = useState<AppUser>(() => {
+    const isCouncilAuthenticated = () => {
+      try {
+        return localStorage.getItem('halisaha_admin_authenticated') === 'true';
+      } catch {
+        return false;
+      }
+    };
+
     // 1. Check if URL param exists (e.g. ?player=p_sidar or ?user=eval_hadi)
     try {
       if (typeof window !== 'undefined') {
@@ -141,7 +149,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const playerParam = params.get('player');
         if (playerParam) {
           const adminMatch = ADMIN_USERS.find(a => a.playerId === playerParam);
-          if (adminMatch) return adminMatch;
+          if (adminMatch) {
+            // Require PIN authentication for admin role, otherwise treat as guest player
+            if (isCouncilAuthenticated()) {
+              return adminMatch;
+            }
+            return {
+              id: `guest_${adminMatch.playerId}`,
+              name: adminMatch.name,
+              role: 'guest',
+              playerId: adminMatch.playerId,
+            };
+          }
           const foundPlayer = RAW_PLAYERS_DATA.find(p => p.id === playerParam);
           if (foundPlayer) {
             return {
@@ -155,7 +174,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const userParam = params.get('user');
         if (userParam) {
           const adminMatch = ADMIN_USERS.find(a => a.id === userParam);
-          if (adminMatch) return adminMatch;
+          if (adminMatch && isCouncilAuthenticated()) {
+            return adminMatch;
+          }
         }
       }
     } catch {}
@@ -163,11 +184,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // 2. Check localStorage
     try {
       const saved = localStorage.getItem('halisaha_current_user');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.role === 'admin') {
+          if (isCouncilAuthenticated()) {
+            return parsed;
+          }
+          return DEFAULT_GUEST_USER;
+        }
+        return parsed;
+      }
     } catch {}
 
-    // 3. Default to Hadi Hoca (Admin)
-    return ADMIN_USERS[0];
+    // 3. Fallback: if previously authenticated as admin, default to Hadi Hoca; otherwise guest
+    if (isCouncilAuthenticated()) {
+      return ADMIN_USERS[0];
+    }
+    return DEFAULT_GUEST_USER;
   });
 
   const handleSetCurrentUser = (user: AppUser) => {

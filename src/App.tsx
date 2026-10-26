@@ -9,6 +9,7 @@ import { FinanceManager } from './components/finance/FinanceManager';
 import { CouncilRules } from './components/council/CouncilRules';
 import { FirebaseConfigModal } from './components/settings/FirebaseConfigModal';
 import { PwaInstallPrompt } from './components/common/PwaInstallPrompt';
+import { AttendanceActionModal } from './components/matches/AttendanceActionModal';
 
 const MainLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('matches');
@@ -40,6 +41,9 @@ const MainLayout: React.FC = () => {
       {showFirebaseModal && (
         <FirebaseConfigModal onClose={() => setShowFirebaseModal(false)} />
       )}
+
+      {/* Instant Match Confirmation Modal for Notified Players */}
+      <AttendanceActionModal />
     </div>
   );
 };

@@ -294,13 +294,18 @@ ${
 
   const openPersonalWhatsAppPing = (player: Player) => {
     const confirmUrl = getConfirmUrl(player.id);
+    const yesUrl = `${confirmUrl}&action=confirm`;
+    const noUrl = `${confirmUrl}&action=decline`;
     const d = new Date(currentMatch.date);
     const day = d.toLocaleDateString('tr-TR', { weekday: 'long' });
     const timeOnly = currentMatch.time.split('-')[0].trim();
     const text = encodeURIComponent(
-      `Selam ${player.name}, ${day} günü saat ${timeOnly}'de maçımız var, gelmek ister misin? ⚽🔥\n` +
-      `📍 Saha: ${currentMatch.venueName}\n\n` +
-      `📲 Katılımını [Geliyorum / Gelmiyorum] tek tıkla onaylamak için:\n${confirmUrl}`
+      `Selam ${player.name}, ${day} günü saat ${timeOnly}'de halı saha maçımız var! ⚽🔥\n` +
+      `📍 Saha: ${currentMatch.venueName}\n` +
+      `💰 Ücret: ${currentMatch.costPerPlayer} ₺\n\n` +
+      `👇 Lütfen katılım durumunu tek tıkla onayla:\n\n` +
+      `🟢 *[ONAYLIYORUM (MAÇA GELİYORUM)]:*\n${yesUrl}\n\n` +
+      `🔴 *[GELMİYORUM]:*\n${noUrl}`
     );
     const phoneParam = player.phone ? `phone=${player.phone.replace(/\D/g, '')}&` : '';
     window.open(`https://api.whatsapp.com/send?${phoneParam}text=${text}`, '_blank');
@@ -308,13 +313,17 @@ ${
 
   const openSubInviteWhatsApp = (player: Player) => {
     const confirmUrl = getConfirmUrl(player.id);
+    const yesUrl = `${confirmUrl}&action=confirm`;
+    const noUrl = `${confirmUrl}&action=decline`;
     const d = new Date(currentMatch.date);
     const day = d.toLocaleDateString('tr-TR', { weekday: 'long' });
     const timeOnly = currentMatch.time.split('-')[0].trim();
     const text = encodeURIComponent(
-      `Selam ${player.name}, ${day} günü saat ${timeOnly}'de maçımızda acil ${player.primaryPosition} eksiğimiz var, gelmek ister misin? 🚨⚽\n` +
+      `🚨 *ACİL YEDEK OYUNCU ÇAĞRISI* 🚨\n\n` +
+      `Selam ${player.name}, ${day} günü saat ${timeOnly}'de maçımızda acil ${player.primaryPosition} eksiğimiz var, kadroya girmek ister misin? ⚽🔥\n` +
       `📍 Saha: ${currentMatch.venueName}\n\n` +
-      `📲 Katılımını onaylamak için tıkla:\n${confirmUrl}`
+      `🟢 *[GELİYORUM (KADROYA GİR)]:*\n${yesUrl}\n\n` +
+      `🔴 *[GELEMİYORUM]:*\n${noUrl}`
     );
     const phoneParam = player.phone ? `phone=${player.phone.replace(/\D/g, '')}&` : '';
     window.open(`https://api.whatsapp.com/send?${phoneParam}text=${text}`, '_blank');
@@ -324,14 +333,40 @@ ${
 
   const openOneDayPlayerWhatsApp = (player: Player) => {
     const confirmUrl = getConfirmUrl(player.id);
+    const yesUrl = `${confirmUrl}&action=confirm`;
+    const noUrl = `${confirmUrl}&action=decline`;
     const timeOnly = currentMatch.time.split('-')[0].trim();
     const text = encodeURIComponent(
-      `Selam ${player.name}, yarın saat ${timeOnly}'de halı saha maçımız var, unutmadın değil mi? ⚽🔥\n` +
-      `📍 Saha: ${currentMatch.venueName}\n\n` +
-      `Çantaları bu akşamdan hazırla! Maç detayları & kadro:\n${confirmUrl}`
+      `⏰ *YARINKİ MAÇ SON TEYİT BİLDİRİMİ* ⏰\n\n` +
+      `Selam ${player.name}, yarın saat ${timeOnly}'de halı saha maçımız var! ⚽🔥\n` +
+      `📍 Saha: ${currentMatch.venueName}\n` +
+      `💰 Kişi Başı: ${currentMatch.costPerPlayer} ₺\n\n` +
+      `Kadro netleştiriliyor. Lütfen katılım durumunu hemen onayla:\n\n` +
+      `🟢 *[ONAYLIYORUM (MAÇA GELİYORUM)]:*\n${yesUrl}\n\n` +
+      `🔴 *[GELMİYORUM (İPTAL)]:*\n${noUrl}\n\n` +
+      `⚠️ Yarın son dakika mağduriyeti olmaması için teyit vermeniz zorunludur!`
     );
     const phoneParam = player.phone ? `phone=${player.phone.replace(/\D/g, '')}&` : '';
     window.open(`https://api.whatsapp.com/send?${phoneParam}text=${text}`, '_blank');
+  };
+
+  const openPendingBroadcastWhatsApp = () => {
+    const pendingNames = categorizedPlayers.bekleniyor
+      .map((p, idx) => `${idx + 1}. ${p.name} (${p.primaryPosition})`)
+      .join('\n');
+    const origin = window.location.origin + window.location.pathname;
+
+    const text = encodeURIComponent(
+      `⏳ *HALI SAHA MAÇI TEYİT ÇAĞRISI* ⏳\n\n` +
+      `📅 *Tarih:* ${dateFormatted} | ${currentMatch.time}\n` +
+      `📍 *Saha:* ${currentMatch.venueName}\n\n` +
+      `Kadromuzu kesinleştirmek için aşağıdaki arkadaşlarımızın ACİLEN durumunu bildirmesi gerekmektedir:\n\n` +
+      `${pendingNames || 'Tüm cevaplar alındı'}\n\n` +
+      `📲 *Lütfen aşağıdaki linke tıklayıp [Maça Geliyorum] veya [Gelmiyorum] butonuna basarak onay verin:*\n` +
+      `${origin}\n\n` +
+      `Teşekkürler! 🤝`
+    );
+    window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
   };
 
   const handleSendOneDayBroadcast = () => {
@@ -590,26 +625,52 @@ ${gelenlerLines || '(Henüz kadro kesinleşmedi)'}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+        {/* Teyit Mini Özeti */}
+        <div className="grid grid-cols-3 gap-2 text-center text-xs">
+          <div className="p-2 rounded-xl bg-emerald-950/40 border border-emerald-500/30">
+            <span className="text-[9px] text-emerald-400 block font-bold">🟢 Onaylayanlar</span>
+            <span className="text-xs font-black text-white">{comingCount} Kişi</span>
+          </div>
+          <div className="p-2 rounded-xl bg-amber-950/40 border border-amber-500/30">
+            <span className="text-[9px] text-amber-400 block font-bold">⏳ Cevap Bekleyen</span>
+            <span className="text-xs font-black text-white">{pendingCount} Kişi</span>
+          </div>
+          <div className="p-2 rounded-xl bg-rose-950/40 border border-rose-500/30">
+            <span className="text-[9px] text-rose-400 block font-bold">🔴 Gelemeyen</span>
+            <span className="text-xs font-black text-white">{categorizedPlayers.gelemiyor.length + sattiCount} Kişi</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
           <button
             onClick={handleSendOneDayBroadcast}
-            className="flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all active:scale-95"
+            className="flex items-center justify-center space-x-1.5 py-2 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all active:scale-95"
           >
             <Share2 className="w-3.5 h-3.5" />
-            <span>Yarınki Maçı Gruba Duyur (WhatsApp)</span>
+            <span>Yarınki Maçı Gruba Duyur</span>
           </button>
+
+          {pendingCount > 0 && (
+            <button
+              onClick={openPendingBroadcastWhatsApp}
+              className="flex items-center justify-center space-x-1.5 py-2 px-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs shadow-md shadow-amber-600/20 transition-all active:scale-95"
+            >
+              <Clock className="w-3.5 h-3.5" />
+              <span>Cevap Bekleyenlere Teyit İste ({pendingCount})</span>
+            </button>
+          )}
 
           <button
             onClick={handleSendOneDayPush}
             disabled={oneDayNotifSent}
-            className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl font-bold text-xs transition-all active:scale-95 border ${
+            className={`flex items-center justify-center space-x-1.5 py-2 px-2.5 rounded-xl font-bold text-xs transition-all active:scale-95 border ${
               oneDayNotifSent
                 ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
                 : 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-300 shadow-sm'
             }`}
           >
             <BellRing className="w-3.5 h-3.5" />
-            <span>{oneDayNotifSent ? 'Bildirim Gönderildi!' : 'Telefonlara Bildirim Gönder (Push)'}</span>
+            <span>{oneDayNotifSent ? 'Bildirim Gönderildi!' : 'Telefonlara Push Bildirim'}</span>
           </button>
         </div>
       </div>
