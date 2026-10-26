@@ -1,6 +1,6 @@
 export type Position = 'Kaleci' | 'Defans' | 'Orta saha' | 'Kanat' | 'Forvet';
 
-export type AttendanceStatus = 'Geldi' | 'Son dakika iptal' | 'Gelmedi' | 'Beklemede' | 'Geliyor' | 'Haber Bekleniyor' | 'Gelemiyor';
+export type AttendanceStatus = 'Geldi' | 'Son dakika iptal' | 'Satış koydu' | 'Gelmedi' | 'Beklemede' | 'Geliyor' | 'Haber Bekleniyor' | 'Gelemiyor';
 
 export interface Evaluator {
   id: string;

@@ -63,6 +63,7 @@ interface AppContextType {
   assignPlayerToTeam: (playerId: string, team: 'teamA' | 'teamB' | 'bench', position?: Position) => void;
   updatePlayerPositionInTeam: (playerId: string, team: 'teamA' | 'teamB', newPosition: Position) => void;
   setTeamFormation: (team: 'teamA' | 'teamB', formation: string) => void;
+  updateMatchDetails: (details: Partial<Match>) => void;
   applyPenalty: (playerId: string, points: number, reason?: string) => void;
   clearPenalties: (playerId: string) => void;
   firebaseActive: boolean;
@@ -186,7 +187,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (!newSquad.includes(playerId)) {
           newSquad.push(playerId);
         }
-      } else if (status === 'Gelemiyor' || status === 'Gelmedi') {
+      } else if (
+        status === 'Gelemiyor' ||
+        status === 'Gelmedi' ||
+        status === 'Son dakika iptal' ||
+        status === 'Satış koydu'
+      ) {
         newSquad = newSquad.filter(id => id !== playerId);
       }
 
@@ -200,27 +206,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return nextMatch;
     });
 
-    // Also update player's penalty and suspension stats if Gelmedi
+    // Also update player's penalty and suspension stats if Gelmedi / Satış koydu
     setPlayers(prev => {
       const next = prev.map(p => {
         if (p.id !== playerId) return p;
 
         let noShowDelta = 0;
         let cancelDelta = 0;
-        if (status === 'Gelmedi') noShowDelta = 1;
-        if (status === 'Son dakika iptal') cancelDelta = 1;
+        let penaltyDelta = 0;
+        if (status === 'Gelmedi') {
+          noShowDelta = 1;
+          penaltyDelta = 30;
+        }
+        if (status === 'Son dakika iptal' || status === 'Satış koydu') {
+          cancelDelta = 1;
+          penaltyDelta = 15;
+        }
 
         const recent = [status, ...(p.attendanceStats.recentAttendance || []).slice(0, 4)];
         const noShowCount = recent.filter(s => s === 'Gelmedi').length;
+        const newPenalty = Math.max(0, p.attendanceStats.penaltyPoints + penaltyDelta);
 
         const updated = recalculatePlayerStats({
           ...p,
           attendanceStats: {
             ...p.attendanceStats,
+            penaltyPoints: newPenalty,
             noShow: p.attendanceStats.noShow + noShowDelta,
             lastMinuteCancel: p.attendanceStats.lastMinuteCancel + cancelDelta,
             recentAttendance: recent,
-            isSuspended: noShowCount >= 2,
+            isSuspended: noShowCount >= 2 || newPenalty >= 30,
           },
         });
 
@@ -646,6 +661,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  // Update current match details (Date, Time, Venue, Pitch, Cost, Format)
+  const updateMatchDetails = (details: Partial<Match>) => {
+    setCurrentMatch(prev => {
+      const nextMatch: Match = {
+        ...prev,
+        ...details,
+      };
+
+      if (details.totalPitchCost !== undefined || details.targetSquadCount !== undefined) {
+        const target = nextMatch.targetSquadCount || 14;
+        nextMatch.costPerPlayer = Math.round(nextMatch.totalPitchCost / (target || 14));
+      }
+
+      saveMatchToDatabase(nextMatch);
+      return nextMatch;
+    });
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -662,6 +695,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         autoBalanceSquad,
         setMatchScores,
         createNewMatch,
+        updateMatchDetails,
         addPlayer,
         batchAddPlayers,
         voteMvp,

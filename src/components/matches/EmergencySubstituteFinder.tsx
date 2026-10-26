@@ -21,12 +21,17 @@ import {
   ArrowRight,
   ExternalLink,
   BellRing,
+  Wallet,
+  Edit3,
+  CreditCard,
+  AlertTriangle,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useApp } from '../../context/AppContext';
 import { Player, AttendanceStatus, Position } from '../../types';
 import { sendOneDayBeforeReminder } from '../../services/notifications';
 import { AddToCalendarModal } from '../common/AddToCalendarModal';
+import { EditMatchModal } from './EditMatchModal';
 
 interface EmergencySubstituteFinderProps {
   onNavigateToSquad?: () => void;
@@ -35,12 +40,13 @@ interface EmergencySubstituteFinderProps {
 export const EmergencySubstituteFinder: React.FC<EmergencySubstituteFinderProps> = ({
   onNavigateToSquad,
 }) => {
-  const { currentMatch, players, playersMap, updateAttendance } = useApp();
+  const { currentMatch, players, playersMap, updateAttendance, togglePayment } = useApp();
 
-  const [activeFilter, setActiveFilter] = useState<'all' | 'geliyor' | 'bekleniyor' | 'gelemiyor'>('bekleniyor');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'geliyor' | 'bekleniyor' | 'gelemiyor' | 'satti'>('bekleniyor');
   const [searchQuery, setSearchQuery] = useState('');
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [showEditMatchModal, setShowEditMatchModal] = useState<'edit' | 'create' | null>(null);
   const [copiedBroadcast, setCopiedBroadcast] = useState(false);
   const [selectedPositionFilter, setSelectedPositionFilter] = useState<string>('all');
 
@@ -52,6 +58,7 @@ export const EmergencySubstituteFinder: React.FC<EmergencySubstituteFinderProps>
     const geliyor: Player[] = [];
     const bekleniyor: Player[] = [];
     const gelemiyor: Player[] = [];
+    const satti: Player[] = [];
     const diger: Player[] = [];
 
     players.forEach(p => {
@@ -60,19 +67,24 @@ export const EmergencySubstituteFinder: React.FC<EmergencySubstituteFinderProps>
         geliyor.push(p);
       } else if (status === 'Haber Bekleniyor' || status === 'Beklemede') {
         bekleniyor.push(p);
-      } else if (status === 'Gelemiyor' || status === 'Gelmedi' || status === 'Son dakika iptal') {
+      } else if (status === 'Satış koydu' || status === 'Son dakika iptal') {
+        satti.push(p);
+      } else if (status === 'Gelemiyor' || status === 'Gelmedi') {
         gelemiyor.push(p);
       } else {
         diger.push(p);
       }
     });
 
-    return { geliyor, bekleniyor, gelemiyor, diger };
+    return { geliyor, bekleniyor, gelemiyor, satti, diger };
   }, [players, currentMatch.attendance]);
 
   const comingCount = categorizedPlayers.geliyor.length;
   const pendingCount = categorizedPlayers.bekleniyor.length;
+  const sattiCount = categorizedPlayers.satti.length;
   const missingCount = Math.max(0, targetCount - comingCount);
+  const comingPaidCount = categorizedPlayers.geliyor.filter(p => currentMatch.payments[p.id]?.isPaid).length;
+  const remainingDebtForMatch = Math.max(0, currentMatch.totalPitchCost - comingPaidCount * currentMatch.costPerPlayer);
   const progressPercent = Math.min(100, Math.round((comingCount / targetCount) * 100));
 
   // Date & Countdown calculation
@@ -186,6 +198,8 @@ export const EmergencySubstituteFinder: React.FC<EmergencySubstituteFinderProps>
       list = [...categorizedPlayers.bekleniyor, ...categorizedPlayers.diger];
     } else if (activeFilter === 'gelemiyor') {
       list = categorizedPlayers.gelemiyor;
+    } else if (activeFilter === 'satti') {
+      list = categorizedPlayers.satti;
     }
 
     if (selectedPositionFilter !== 'all') {
@@ -336,42 +350,123 @@ ${gelenlerLines || '(Henüz kadro kesinleşmedi)'}
     }
   };
 
+  const getBankDetails = () => {
+    const iban = localStorage.getItem('halisaha_iban') || 'TR33 0006 1005 1234 5678 9012 34';
+    const receiver = localStorage.getItem('halisaha_receiver') || 'Hadi Hoca';
+    return { iban, receiver };
+  };
+
+  const [copiedIbanToast, setCopiedIbanToast] = useState(false);
+
+  const copyIbanQuick = () => {
+    const { iban, receiver } = getBankDetails();
+    navigator.clipboard.writeText(
+      `⚽ HALI SAHA MAÇ ÖDEMESİ\n💰 Kişi Başı: ${currentMatch.costPerPlayer} ₺\n🏦 IBAN: ${iban}\n👤 Alıcı: ${receiver}\n📝 Açıklama: [Ad Soyad] Halısaha`
+    );
+    setCopiedIbanToast(true);
+    confetti({ particleCount: 25, spread: 50, origin: { y: 0.8 } });
+    setTimeout(() => setCopiedIbanToast(false), 2500);
+  };
+
+  const openPlayerIbanWhatsApp = (player: Player) => {
+    const { iban, receiver } = getBankDetails();
+    const text = encodeURIComponent(
+      `Selam ${player.name}, halı saha maç ödemesi için bilgiler aşağıdadır ⚽💰\n\n` +
+      `📅 Tarih: ${dateFormatted} | ${currentMatch.time}\n` +
+      `📍 Saha: ${currentMatch.venueName}\n` +
+      `💰 Tutar: ${currentMatch.costPerPlayer} ₺\n\n` +
+      `🏦 IBAN: ${iban}\n` +
+      `👤 Alıcı: ${receiver}\n` +
+      `📝 Açıklama: ${player.name} Halısaha\n\n` +
+      `Gönderince dekont iletirsen veya bilgi verirsen sevinirim, teşekkürler!`
+    );
+    window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+  };
+
+  const openMatchIbanGroupWhatsApp = () => {
+    const { iban, receiver } = getBankDetails();
+    const unpaidList = categorizedPlayers.geliyor
+      .filter(p => !currentMatch.payments[p.id]?.isPaid)
+      .map((p, idx) => `${idx + 1}. ${p.name} (${currentMatch.costPerPlayer} ₺)`)
+      .join('\n');
+
+    const text = encodeURIComponent(
+      `⚽ *HALI SAHA MAÇI KASA & IBAN DUYURUSU* ⚽\n` +
+      `📅 *Tarih:* ${dateFormatted} | ${currentMatch.time}\n` +
+      `📍 *Saha:* ${currentMatch.venueName}\n` +
+      `👥 *Format:* ${currentMatch.matchFormat || '7v7'} (${targetCount} Kişi)\n` +
+      `💰 *Kişi Başı Ücret:* ${currentMatch.costPerPlayer} ₺\n\n` +
+      `🏦 *IBAN:* ${iban}\n` +
+      `👤 *Alıcı:* ${receiver}\n` +
+      `📝 *Açıklama:* [Adınız] Halısaha\n\n` +
+      `📊 *Ödeme Durumu:* ${comingPaidCount} / ${comingCount} Kişi Ödedi\n` +
+      `💵 *Kalan Kasa Tutarı:* ${remainingDebtForMatch} ₺\n\n` +
+      (unpaidList ? `⏳ *Ödeme Bekleyenler:*\n${unpaidList}\n\n` : `🎉 *Tüm gelenlerin ödemesi tamamlandı!*\n\n`) +
+      `Ödeme yapan arkadaşlar lütfen gruba dekont atsın veya bilgi versin. Teşekkürler! 🤝`
+    );
+    window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+  };
+
   return (
     <div className="space-y-4">
       {/* 1. TARİH, SAAT & GERİ SAYIM KARTI */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 border border-emerald-500/30 p-4 shadow-xl">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
           <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[11px] font-bold">
             <Calendar className="w-3.5 h-3.5 text-emerald-400" />
-            <span>TARİH & MAÇ PLANI</span>
+            <span>{currentMatch.matchNumber}. HAFTA MAÇI</span>
           </div>
 
-          <div
-            className={`flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${
-              isUrgent
-                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30 animate-pulse'
-                : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-            }`}
-          >
-            <Clock className="w-3.5 h-3.5" />
-            <span>{countdownText}</span>
+          <div className="flex items-center space-x-1.5">
+            <button
+              onClick={() => setShowEditMatchModal('edit')}
+              className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-[11px] font-bold transition-all active:scale-95 shadow-sm"
+              title="Bu Maçın Tarih, Saat, Saha ve Ücretini Düzenle"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>Maçı Düzenle</span>
+            </button>
+            <button
+              onClick={() => setShowEditMatchModal('create')}
+              className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 text-[11px] font-bold transition-all active:scale-95 shadow-sm"
+              title="Yeni Hafta Maçı Planla"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Yeni Maç</span>
+            </button>
+            <div
+              className={`flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                isUrgent
+                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30 animate-pulse'
+                  : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5" />
+              <span>{countdownText}</span>
+            </div>
           </div>
         </div>
 
         {/* Date Display */}
         <h2 className="text-lg font-black text-white capitalize leading-tight mb-1">{dateFormatted}</h2>
 
-        <div className="flex flex-wrap items-center gap-3 text-xs text-slate-300 mb-3">
-          <div className="flex items-center space-x-1">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300 mb-3">
+          <div className="flex items-center space-x-1 bg-slate-950/60 px-2 py-1 rounded-lg border border-slate-800">
             <Clock className="w-3.5 h-3.5 text-emerald-400" />
             <span className="font-semibold text-white">{currentMatch.time}</span>
           </div>
-          <div className="flex items-center space-x-1">
+          <div className="flex items-center space-x-1 bg-slate-950/60 px-2 py-1 rounded-lg border border-slate-800">
             <MapPin className="w-3.5 h-3.5 text-rose-400" />
             <span>{currentMatch.venueName}</span>
           </div>
-          <div className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+          <div className="text-[10px] px-2 py-1 rounded-lg bg-slate-950/60 text-slate-300 border border-slate-800">
             {currentMatch.pitchNo}
+          </div>
+          <div className="text-[10px] px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 font-bold">
+            {currentMatch.matchFormat || '7v7'} ({targetCount} Kişi)
+          </div>
+          <div className="text-[10px] px-2 py-1 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/30 font-bold">
+            {currentMatch.costPerPlayer} ₺ / Kişi
           </div>
         </div>
 
@@ -496,6 +591,84 @@ ${gelenlerLines || '(Henüz kadro kesinleşmedi)'}
         </div>
       </div>
 
+      {/* 3. BU MAÇA ÖZEL KASA & IBAN DUYURUSU */}
+      <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-900 border border-emerald-500/30 space-y-3 shadow-lg">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
+              <Wallet className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-1.5">
+                <h3 className="text-xs font-black text-white uppercase tracking-wider">
+                  Bu Maça Özel Para Toplama & IBAN
+                </h3>
+                <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                  {currentMatch.costPerPlayer} ₺ / Kişi
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400">
+                Bu maça katılan oyuncuların ödemelerini takip edin, IBAN ve kasa durumunu WhatsApp'a iletin
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Kasa Mini İstatistikleri */}
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="p-2 rounded-xl bg-slate-950/70 border border-slate-800">
+            <span className="text-[9px] text-slate-400 block">Saha Ücreti</span>
+            <span className="text-xs font-black text-white font-mono">{currentMatch.totalPitchCost} ₺</span>
+          </div>
+          <div className="p-2 rounded-xl bg-emerald-950/30 border border-emerald-500/30">
+            <span className="text-[9px] text-emerald-400 block">Toplanan ({comingPaidCount} Kişi)</span>
+            <span className="text-xs font-black text-emerald-300 font-mono">
+              {comingPaidCount * currentMatch.costPerPlayer} ₺
+            </span>
+          </div>
+          <div className="p-2 rounded-xl bg-rose-950/30 border border-rose-500/30">
+            <span className="text-[9px] text-rose-400 block">Kalan Borç</span>
+            <span className="text-xs font-black text-rose-300 font-mono">{remainingDebtForMatch} ₺</span>
+          </div>
+        </div>
+
+        {/* IBAN Bilgisi ve Gruba Duyur Butonu */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs">
+          <div className="flex items-center space-x-2 text-slate-300 truncate">
+            <CreditCard className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="font-mono text-[11px] text-emerald-200 truncate">{getBankDetails().iban}</span>
+            <span className="text-[10px] text-slate-400 shrink-0">({getBankDetails().receiver})</span>
+          </div>
+
+          <div className="flex items-center space-x-1.5 shrink-0">
+            <button
+              onClick={copyIbanQuick}
+              className="flex-1 sm:flex-initial flex items-center justify-center space-x-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] font-bold transition-all active:scale-95"
+            >
+              {copiedIbanToast ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-emerald-400">Kopyalandı</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>IBAN Kopyala</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={openMatchIbanGroupWhatsApp}
+              className="flex-1 sm:flex-initial flex items-center justify-center space-x-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold shadow-md shadow-emerald-600/20 transition-all active:scale-95"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>Gruba IBAN & Kasa At</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* 3. MEVKİ EKSİKLERİ & AKILLI YEDEK ÖNERİLERİ (Eğer Eksik Varsa) */}
       {missingCount > 0 && (
         <div className="p-3.5 rounded-2xl bg-gradient-to-r from-rose-950/40 via-slate-900 to-slate-900 border border-rose-500/30 space-y-3 shadow-lg">
@@ -589,7 +762,7 @@ ${gelenlerLines || '(Henüz kadro kesinleşmedi)'}
         </div>
 
         {/* Filter Tabs */}
-        <div className="grid grid-cols-4 gap-1 p-1 bg-slate-950 rounded-xl border border-slate-800 text-xs">
+        <div className="grid grid-cols-5 gap-1 p-1 bg-slate-950 rounded-xl border border-slate-800 text-xs">
           <button
             onClick={() => setActiveFilter('bekleniyor')}
             className={`py-1.5 px-1 rounded-lg font-bold text-center transition-all ${
@@ -624,6 +797,17 @@ ${gelenlerLines || '(Henüz kadro kesinleşmedi)'}
           </button>
 
           <button
+            onClick={() => setActiveFilter('satti')}
+            className={`py-1.5 px-1 rounded-lg font-bold text-center transition-all ${
+              activeFilter === 'satti'
+                ? 'bg-rose-600 text-white shadow-md animate-pulse'
+                : 'text-rose-400 hover:text-white'
+            }`}
+          >
+            Sattı 🚨 ({sattiCount})
+          </button>
+
+          <button
             onClick={() => setActiveFilter('all')}
             className={`py-1.5 px-1 rounded-lg font-bold text-center transition-all ${
               activeFilter === 'all'
@@ -631,7 +815,7 @@ ${gelenlerLines || '(Henüz kadro kesinleşmedi)'}
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            Tümü (45)
+            Tümü ({players.length})
           </button>
         </div>
 
@@ -663,7 +847,7 @@ ${gelenlerLines || '(Henüz kadro kesinleşmedi)'}
         </div>
 
         {/* Player List */}
-        <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+        <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
           {displayPlayers.length === 0 ? (
             <div className="p-6 text-center text-xs text-slate-500">
               Bu filtreye uygun oyuncu bulunamadı.
@@ -673,13 +857,17 @@ ${gelenlerLines || '(Henüz kadro kesinleşmedi)'}
               const status = currentMatch.attendance[p.id] || 'Haber Bekleniyor';
               const isComing = status === 'Geliyor' || status === 'Geldi';
               const isPending = status === 'Haber Bekleniyor' || status === 'Beklemede';
-              const isNotComing = status === 'Gelemiyor' || status === 'Gelmedi' || status === 'Son dakika iptal';
+              const isNotComing = status === 'Gelemiyor' || status === 'Gelmedi';
+              const isSatti = status === 'Satış koydu' || status === 'Son dakika iptal';
+              const isPaid = !!currentMatch.payments[p.id]?.isPaid;
 
               return (
                 <div
                   key={p.id}
-                  className={`p-2.5 rounded-xl border transition-all flex items-center justify-between ${
-                    isComing
+                  className={`p-2.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
+                    isSatti
+                      ? 'bg-red-950/30 border-red-500/40'
+                      : isComing
                       ? 'bg-emerald-950/20 border-emerald-500/30'
                       : isPending
                       ? 'bg-amber-950/20 border-amber-500/30'
@@ -688,16 +876,38 @@ ${gelenlerLines || '(Henüz kadro kesinleşmedi)'}
                 >
                   <div className="flex items-center space-x-2.5">
                     <div
-                      className={`w-2.5 h-2.5 rounded-full ${
-                        isComing ? 'bg-emerald-400' : isPending ? 'bg-amber-400' : 'bg-rose-400'
+                      className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                        isSatti
+                          ? 'bg-rose-500 animate-ping'
+                          : isComing
+                          ? 'bg-emerald-400'
+                          : isPending
+                          ? 'bg-amber-400'
+                          : 'bg-slate-500'
                       }`}
                     />
                     <div>
-                      <div className="flex items-center space-x-1.5">
+                      <div className="flex items-center space-x-1.5 flex-wrap">
                         <span className="font-bold text-xs text-white">{p.name}</span>
                         {p.isJoker && (
                           <span className="text-[8px] px-1 py-0.2 rounded bg-purple-500/20 text-purple-300 font-bold">
                             Joker
+                          </span>
+                        )}
+                        {isSatti && (
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-rose-600/30 text-rose-300 border border-rose-500/40 font-black">
+                            🚨 SATTI (-15 P)
+                          </span>
+                        )}
+                        {isComing && (
+                          <span
+                            className={`text-[9px] px-1.5 py-0.2 rounded font-bold border ${
+                              isPaid
+                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                            }`}
+                          >
+                            {isPaid ? 'Ödedi ✓' : 'Ödemedi ⏳'}
                           </span>
                         )}
                       </div>
@@ -707,38 +917,72 @@ ${gelenlerLines || '(Henüz kadro kesinleşmedi)'}
                         <span className="font-mono text-emerald-400 font-bold">
                           {Math.round(p.finalScore * 10)} OVR
                         </span>
+                        {p.attendanceStats.penaltyPoints > 0 && (
+                          <>
+                            <span>•</span>
+                            <span className="text-rose-400 font-bold">
+                              Ceza: {p.attendanceStats.penaltyPoints} P
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
 
                   {/* Quick Action Toggles */}
-                  <div className="flex items-center space-x-1">
-                    {/* Ping via WhatsApp if pending */}
+                  <div className="flex items-center flex-wrap gap-1">
+                    {/* Coming Player In-match Payment & IBAN Actions */}
+                    {isComing && (
+                      <>
+                        <button
+                          onClick={() => togglePayment(p.id)}
+                          title={isPaid ? 'Ödemeyi İptal Et' : 'Ödedi Olarak İşaretle'}
+                          className={`flex items-center space-x-1 px-2 py-1 rounded-lg text-[10px] font-bold border transition-all active:scale-95 ${
+                            isPaid
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                              : 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
+                          }`}
+                        >
+                          <Wallet className="w-3 h-3" />
+                          <span>{isPaid ? 'Ödedi ✓' : 'Ödeme Al'}</span>
+                        </button>
+
+                        <button
+                          onClick={() => openPlayerIbanWhatsApp(p)}
+                          title="Oyuncuya WhatsApp'tan IBAN ve Ücret Bilgisi Gönder"
+                          className="flex items-center space-x-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[10px] font-bold transition-all active:scale-95"
+                        >
+                          <CreditCard className="w-3 h-3 text-emerald-400" />
+                          <span>IBAN At</span>
+                        </button>
+
+                        <button
+                          onClick={() => openOneDayPlayerWhatsApp(p)}
+                          title="Yarınki Maçı Hatırlat (WhatsApp Teyit)"
+                          className="p-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 text-xs transition-all active:scale-95"
+                        >
+                          <BellRing className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
+
+                    {/* Pending Ping */}
                     {isPending && (
                       <button
                         onClick={() => openPersonalWhatsAppPing(p)}
                         title="WhatsApp'tan Durum Sor"
-                        className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs transition-all active:scale-95"
+                        className="flex items-center space-x-1 px-2 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold transition-all active:scale-95"
                       >
-                        <MessageCircle className="w-3.5 h-3.5" />
+                        <MessageCircle className="w-3 h-3" />
+                        <span>Sor</span>
                       </button>
                     )}
 
-                    {/* 1 Day Before Reminder Ping if Confirmed */}
-                    {isComing && (
-                      <button
-                        onClick={() => openOneDayPlayerWhatsApp(p)}
-                        title="Yarınki Maçı Hatırlat (WhatsApp Teyit)"
-                        className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 text-xs transition-all active:scale-95"
-                      >
-                        <BellRing className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-
-                    {/* Coming Toggle */}
+                    {/* 4 Attendance Status Buttons */}
+                    {/* 1. Geliyor */}
                     <button
                       onClick={() => updateAttendance(p.id, 'Geliyor')}
-                      title="Geliyor Olarak İşaretle"
+                      title="Geliyor Olarak İşaretle (Kadroya Alınır)"
                       className={`px-2 py-1 rounded-lg text-[10px] font-black border transition-all ${
                         isComing
                           ? 'bg-emerald-500 text-black border-emerald-400 shadow-sm'
@@ -748,7 +992,7 @@ ${gelenlerLines || '(Henüz kadro kesinleşmedi)'}
                       Geliyor
                     </button>
 
-                    {/* Pending Toggle */}
+                    {/* 2. Bekliyor */}
                     <button
                       onClick={() => updateAttendance(p.id, 'Haber Bekleniyor')}
                       title="Haber Bekleniyor / Beklemede"
@@ -758,20 +1002,33 @@ ${gelenlerLines || '(Henüz kadro kesinleşmedi)'}
                           : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
                       }`}
                     >
-                      Beklemede
+                      Bekliyor
                     </button>
 
-                    {/* Not Coming Toggle */}
+                    {/* 3. Gelemiyor */}
                     <button
                       onClick={() => updateAttendance(p.id, 'Gelemiyor')}
                       title="Gelemiyor Olarak İşaretle"
                       className={`px-2 py-1 rounded-lg text-[10px] font-black border transition-all ${
                         isNotComing
-                          ? 'bg-rose-500 text-white border-rose-400 shadow-sm'
+                          ? 'bg-slate-700 text-white border-slate-600 shadow-sm'
                           : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
                       }`}
                     >
-                      Yok
+                      Gelmiyor
+                    </button>
+
+                    {/* 4. Satış Koydu (Sattı 🚨) */}
+                    <button
+                      onClick={() => updateAttendance(p.id, 'Satış koydu')}
+                      title="Son Anda Satış Koydu (-15 Ceza Puanı, Kadrodan Çıkarılır)"
+                      className={`px-2 py-1 rounded-lg text-[10px] font-black border transition-all ${
+                        isSatti
+                          ? 'bg-rose-600 text-white border-rose-500 shadow-md animate-pulse'
+                          : 'bg-rose-950/40 text-rose-300 border-rose-800/60 hover:bg-rose-900/50'
+                      }`}
+                    >
+                      Sattı 🚨
                     </button>
                   </div>
                 </div>
@@ -844,6 +1101,14 @@ ${gelenlerLines || '(Henüz kadro kesinleşmedi)'}
         <AddToCalendarModal
           match={currentMatch}
           onClose={() => setShowCalendarModal(false)}
+        />
+      )}
+
+      {/* 7. EDIT / CREATE MATCH MODAL */}
+      {showEditMatchModal && (
+        <EditMatchModal
+          initialMode={showEditMatchModal}
+          onClose={() => setShowEditMatchModal(null)}
         />
       )}
     </div>
