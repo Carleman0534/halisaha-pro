@@ -70,3 +70,19 @@
 .animate-shake {
   animation: shakeError 0.35s ease-in-out;
 }
+
+/* Mobile Left Drawer Keyframes (Sol Sayfaya Yanaşık Menü Animasyonu) */
+@keyframes slideInFromLeft {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0.4;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in-left {
+  animation: slideInFromLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

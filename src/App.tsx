@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { AppProvider } from './context/AppContext';
-import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { BottomNav, TabType } from './components/BottomNav';
 import { MatchPlanner } from './components/matches/MatchPlanner';
@@ -18,18 +17,15 @@ const MainLayout: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row selection:bg-emerald-500 selection:text-white">
-      {/* 1. VERTICAL LEFT SIDEBAR: Pinned along the left of the page on desktop (Sayfanın solunda dik blok) */}
+      {/* 1. SIDEBAR & MOBILE LEFT DOCK: Hem masaüstünde hem mobilde sol sayfaya yanaşık blok */}
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onOpenFirebaseModal={() => setShowFirebaseModal(true)}
       />
 
-      {/* 2. TOP MOBILE HEADER: Shown on mobile screens (< md) */}
-      <Header onOpenFirebaseModal={() => setShowFirebaseModal(true)} />
-
-      {/* 3. MAIN CONTENT AREA: Expands gracefully to the right of the vertical sidebar on desktop */}
-      <main className="flex-1 w-full md:pl-64 lg:pl-72 min-h-screen px-3.5 sm:px-6 lg:px-8 pt-4 pb-24 md:pb-8">
+      {/* 2. ANA SAYFA ALANI: Mobilde sol yanaşık butonun altından başlar, masaüstünde sağa genişler */}
+      <main className="flex-1 w-full md:pl-64 lg:pl-72 min-h-screen px-3.5 sm:px-6 lg:px-8 pt-16 md:pt-6 pb-24 md:pb-8">
         <div className="w-full max-w-6xl mx-auto">
           {/* PWA Install Banner */}
           <PwaInstallPrompt />
@@ -44,15 +40,15 @@ const MainLayout: React.FC = () => {
         </div>
       </main>
 
-      {/* 4. BOTTOM MOBILE NAV: Shown on mobile screens (< md), hidden on desktop */}
+      {/* 3. MOBİL 5'Lİ ALT BAR: Mobilde görünür (< md), masaüstünde gizlenir */}
       <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      {/* Firebase Settings Modal */}
+      {/* Firebase Ayarlar Modalı */}
       {showFirebaseModal && (
         <FirebaseConfigModal onClose={() => setShowFirebaseModal(false)} />
       )}
 
-      {/* Instant Match Confirmation Modal for Notified Players */}
+      {/* WhatsApp Bildirim Onay Modalı */}
       <AttendanceActionModal />
     </div>
   );

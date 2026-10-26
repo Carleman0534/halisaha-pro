@@ -13,6 +13,8 @@ import {
   BookOpen,
   ArrowRightLeft,
   ChevronDown,
+  ChevronRight,
+  X,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useApp } from '../context/AppContext';
@@ -35,6 +37,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenFirebaseModal,
 }) => {
   const { currentMatch, currentUser, setCurrentUser, isCouncil, firebaseActive } = useApp();
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authDefaultTab, setAuthDefaultTab] = useState<'admin' | 'guest'>('admin');
@@ -57,6 +60,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const handleOpenAuth = (tab: 'admin' | 'guest') => {
     setAuthDefaultTab(tab);
     setShowAuthModal(true);
+    setMobileDrawerOpen(false);
   };
 
   const handleQuickSelectAdmin = (admin: AppUser) => {
@@ -66,6 +70,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       try {
         confetti({ particleCount: 30, spread: 60, origin: { y: 0.5 } });
       } catch {}
+      setMobileDrawerOpen(false);
     } else {
       handleOpenAuth('admin');
     }
@@ -102,16 +107,209 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <>
       {/* ============================================================== */}
-      {/* VERTICAL LEFT SIDEBAR (SAYFANIN SOLUNDA DİK OLAN BLOK)         */}
+      {/* 1. MOBİL: SOL SAYFAYA YANAŞIK DOCK BUTONU (HUGS THE LEFT EDGE)  */}
+      {/* ============================================================== */}
+      <div className="md:hidden fixed left-0 top-3 z-40">
+        <button
+          type="button"
+          onClick={() => setMobileDrawerOpen(true)}
+          className="flex items-center space-x-2 pl-2 pr-3 py-1.5 rounded-r-2xl bg-slate-900/98 border-y border-r border-emerald-500/50 shadow-xl shadow-black/80 backdrop-blur-md active:scale-95 transition-all group select-none cursor-pointer"
+          title="Sol Menüyü ve Paneli Aç"
+        >
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-green-400 flex items-center justify-center shadow-md shadow-emerald-500/30 text-white shrink-0 group-hover:scale-105 transition-transform">
+            <Shield className="w-4 h-4" />
+          </div>
+          <div className="text-left">
+            <div className="flex items-center space-x-1">
+              <span className="font-black text-white text-xs tracking-tight">HALISAHA</span>
+              <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                PRO
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-300 font-medium">
+              {currentMatch.matchNumber}. Hafta • {roleLabel}
+            </p>
+          </div>
+          <ChevronRight className="w-3.5 h-3.5 text-emerald-400 group-hover:translate-x-0.5 transition-transform" />
+        </button>
+      </div>
+
+      {/* MOBİL: SAĞ ÜST HIZLI AKSİYON (ÇIKIŞ VEYA YÖNETİCİYE GEÇ) */}
+      <div className="md:hidden fixed right-2.5 top-3 z-40 flex items-center space-x-1.5">
+        {isLoggedUser ? (
+          <button
+            onClick={handleDirectLogout}
+            title="Oturumu Kapat ve Misafir Ol"
+            className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 text-xs font-bold shadow-lg backdrop-blur-md active:scale-95 transition-all"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Çıkış</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => handleOpenAuth('admin')}
+            className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-black text-xs font-black shadow-lg shadow-amber-500/25 border border-amber-300 active:scale-95 transition-all animate-pulse"
+          >
+            <Crown className="w-3.5 h-3.5 text-black" />
+            <span>Yönetici</span>
+          </button>
+        )}
+      </div>
+
+      {/* ============================================================== */}
+      {/* 2. MOBİL: SOL SAYFADAN AÇILAN ÇEKMECE PANELİ (MOBILE LEFT DRAWER)*/}
+      {/* ============================================================== */}
+      {mobileDrawerOpen && (
+        <div
+          onClick={() => setMobileDrawerOpen(false)}
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm md:hidden animate-in fade-in duration-200"
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="fixed inset-y-0 left-0 w-72 max-w-[85vw] bg-slate-900/98 border-r-2 border-emerald-500/50 shadow-2xl p-4 flex flex-col justify-between animate-slide-in-left select-none overflow-y-auto"
+          >
+            <div className="space-y-4">
+              {/* Header with Close Button */}
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-green-400 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
+                    <Shield className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-white text-sm">HALISAHA PRO</h3>
+                    <p className="text-[10px] text-slate-400">{currentMatch.matchNumber}. Hafta • {roleLabel}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setMobileDrawerOpen(false)}
+                  className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Vertical Navigation Tabs */}
+              <nav className="space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-1 block mb-1">
+                  Menü
+                </span>
+                {navTabs.map(tab => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.id;
+
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => {
+                        setActiveTab(tab.id);
+                        setMobileDrawerOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-bold text-xs transition-all ${
+                        isActive
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2.5">
+                        <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-400' : 'text-slate-400'}`} />
+                        <span>{tab.label}</span>
+                      </div>
+                      {tab.badge && (
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black text-white ${tab.badgeColor || 'bg-emerald-600'}`}>
+                          {tab.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </nav>
+
+              {/* Quick 1-Tap Switchers */}
+              <div className="p-2.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  ⚡ Hızlı Geçiş:
+                </span>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {ADMIN_USERS.slice(0, 4).map(admin => (
+                    <button
+                      key={admin.id}
+                      onClick={() => handleQuickSelectAdmin(admin)}
+                      className={`py-1.5 px-2 rounded-xl text-xs font-bold truncate border transition-all ${
+                        currentUser.id === admin.id
+                          ? 'bg-amber-500 text-black border-amber-400'
+                          : 'bg-slate-900 text-slate-300 border-slate-800'
+                      }`}
+                    >
+                      👑 {admin.name.split(' ')[0]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Actions inside Mobile Drawer */}
+            <div className="space-y-2 pt-3 border-t border-slate-800">
+              <div className="p-2.5 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
+                <button
+                  onClick={() => handleOpenAuth(isCouncil ? 'admin' : 'guest')}
+                  className="flex items-center space-x-2 truncate text-left flex-1 min-w-0"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-xs shrink-0">
+                    {currentUser.role === 'admin' ? <Crown className="w-4 h-4" /> : <User className="w-4 h-4" />}
+                  </div>
+                  <div className="truncate">
+                    <span className="text-xs font-bold text-white block truncate">{currentUser.name}</span>
+                    <span className="text-[10px] text-slate-400">{roleLabel} • Değiştir ▾</span>
+                  </div>
+                </button>
+                {isLoggedUser && (
+                  <button
+                    onClick={handleDirectLogout}
+                    className="p-1.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 transition-all shrink-0 ml-1"
+                    title="Çıkış"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => {
+                    setShowNotificationModal(true);
+                    setMobileDrawerOpen(false);
+                  }}
+                  className="py-2 px-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 text-xs font-bold flex items-center justify-center space-x-1"
+                >
+                  <Bell className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Bildirimler</span>
+                </button>
+                <button
+                  onClick={() => {
+                    onOpenFirebaseModal();
+                    setMobileDrawerOpen(false);
+                  }}
+                  className="py-2 px-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 text-xs font-bold flex items-center justify-center space-x-1"
+                >
+                  <Database className={`w-3.5 h-3.5 ${firebaseActive ? 'text-emerald-400' : 'text-amber-400'}`} />
+                  <span>{firebaseActive ? 'Canlı' : 'Yerel'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* 3. MASAÜSTÜ: SAYFANIN SOLUNDA DİK OLAN SABİT BLOK (DESKTOP)     */}
       {/* ============================================================== */}
       <aside className="hidden md:flex fixed top-0 left-0 bottom-0 w-64 lg:w-72 bg-slate-900/98 border-r border-slate-800 z-40 flex-col justify-between p-4 shadow-xl select-none">
         {/* TOP SECTION: BRAND & CONTROL CENTER BUTTON */}
         <div className="space-y-4">
-          {/* Logo & Week Header (Clickable to open full-page control center) */}
           <button
             type="button"
             onClick={() => handleOpenAuth(isCouncil ? 'admin' : 'guest')}
-            title="Tüm Sayfaya Kontrol Perdesini Aç (Rol Değiştir)"
+            title="Kontrol Perdesini Aç (Rol Değiştir)"
             className="w-full p-3 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-emerald-500/50 hover:bg-slate-950 text-left transition-all group cursor-pointer active:scale-[0.98]"
           >
             <div className="flex items-center space-x-3">
@@ -208,7 +406,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* BOTTOM SECTION: ACTIVE USER CARD, LOGOUT & SYSTEM CONTROLS */}
         <div className="space-y-2 pt-3 border-t border-slate-800">
-          {/* Active Profile Status with Direct Logout Button */}
           <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
             <button
               onClick={() => handleOpenAuth(isCouncil ? 'admin' : 'guest')}
@@ -241,7 +438,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </button>
 
-            {/* DIRECT LOGOUT BUTTON (TEK TIKLA OTURUMU KAPAT) */}
             {isLoggedUser && (
               <button
                 onClick={handleDirectLogout}
@@ -253,7 +449,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
           </div>
 
-          {/* System Notification Bell & Firebase Live Status */}
           <div className="flex items-center space-x-2">
             <button
               onClick={() => setShowNotificationModal(true)}
@@ -281,7 +476,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </aside>
 
-      {/* Role / Auth Selection Modal (Full-page shade on desktop, pull-down on mobile) */}
+      {/* Role / Auth Selection Modal */}
       {showAuthModal && (
         <AuthRoleModal
           defaultTab={authDefaultTab}
