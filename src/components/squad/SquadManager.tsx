@@ -26,6 +26,7 @@ import {
   Clock,
   User,
   X,
+  Crown,
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import confetti from 'canvas-confetti';
@@ -34,6 +35,7 @@ import { generateWhatsAppShareText } from '../../utils/calculations';
 import { Position, SquadVersion } from '../../types';
 import { canViewRoster, canViewRatings } from '../../utils/permissions';
 import { SquadVisualCardModal } from './SquadVisualCardModal';
+import { AuthRoleModal } from '../auth/AuthRoleModal';
 
 export const SquadManager: React.FC = () => {
   const {
@@ -65,6 +67,7 @@ export const SquadManager: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'pitch' | 'manualTeam' | 'poolSelect'>('pitch');
   const [showVersionHistoryModal, setShowVersionHistoryModal] = useState(false);
   const [showVisualCardModal, setShowVisualCardModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   // Selected week match ID for week switching
   const [selectedMatchId, setSelectedMatchId] = useState<string>(currentMatch.id);
@@ -285,17 +288,14 @@ export const SquadManager: React.FC = () => {
     updateSquad(nextSquad, activeMatch.id);
   };
 
-  // Handle tactical chip click on pitch
+  // Handle tactical chip click on pitch (Her kullanıcı için paneli açar)
   const handleChipClick = (playerId: string, team: 'teamA' | 'teamB') => {
-    if (!isAdmin) {
-      return;
-    }
-    if (isFinalized) {
-      alert('Kadro kesinleştiği için kilitlidir. Değişiklik yapmak için önce kilidi açınız.');
-      return;
-    }
-
+    // Eğer takas (swap) modundaysa
     if (selectedPlayerToSwap) {
+      if (!isAdmin && !isCouncil) {
+        setSelectedPlayerToSwap(null);
+        return;
+      }
       if (selectedPlayerToSwap.playerId === playerId) {
         setSelectedPlayerToSwap(null);
       } else {
@@ -312,9 +312,11 @@ export const SquadManager: React.FC = () => {
           setSelectedPlayerToSwap(null);
         }
       }
-    } else {
-      setPitchPlayerModal({ playerId, team });
+      return;
     }
+
+    // Sahadaki oyuncuya tıklandığında paneli aç
+    setPitchPlayerModal({ playerId, team });
   };
 
   // IF ROSTER ACCESS IS DENIED (Rule 5: Misafir - Gelmiyorum veya yetkisiz)
@@ -1289,107 +1291,207 @@ export const SquadManager: React.FC = () => {
       {/* ============================================================ */}
       {/* TACTICAL PLAYER CONTROL MODAL (Sahadaki Oyuncuya Tıklayınca) */}
       {/* ============================================================ */}
-      {pitchPlayerModal && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4 animate-in slide-in-from-bottom">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-              <div>
-                <span className="text-[10px] uppercase font-bold text-emerald-400 block tracking-wider">
-                  SAHA İÇİ MEVKİ & TAKIM YÖNETİMİ
-                </span>
-                <h3 className="text-base font-black text-white">
-                  {playersMap[pitchPlayerModal.playerId]?.name}
-                </h3>
-              </div>
-              <button
-                onClick={() => setPitchPlayerModal(null)}
-                className="text-slate-400 hover:text-white p-1"
-              >
-                ✕
-              </button>
-            </div>
+      {pitchPlayerModal && (() => {
+        const pObj = playersMap[pitchPlayerModal.playerId];
+        const canManage = (isAdmin || isCouncil) && !isFinalized;
+        const isTeamA = pitchPlayerModal.team === 'teamA';
+        const teamLabel = isTeamA ? 'Kırmızı Takım' : 'Mavi Takım';
+        const currentPos = (isTeamA
+          ? activeMatch.teamA.players
+          : activeMatch.teamB.players
+        ).find(p => p.playerId === pitchPlayerModal.playerId)?.position || pObj?.primaryPosition || 'Oyuncu';
 
-            <div className="space-y-3">
-              <div>
-                <label className="text-[11px] font-semibold text-slate-400 block mb-1">Takım Değiştir</label>
-                <button
-                  onClick={() => {
-                    const targetTeam = pitchPlayerModal.team === 'teamA' ? 'teamB' : 'teamA';
-                    assignPlayerToTeam(pitchPlayerModal.playerId, targetTeam, undefined, activeMatch.id);
-                    setPitchPlayerModal(null);
-                  }}
-                  className={`w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-all ${
-                    pitchPlayerModal.team === 'teamA'
-                      ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-md'
-                      : 'bg-rose-600 hover:bg-rose-500 text-white shadow-md'
-                  }`}
-                >
-                  <ArrowLeftRight className="w-4 h-4" />
-                  <span>
-                    {pitchPlayerModal.team === 'teamA' ? 'Mavi Takıma Geçir' : 'Kırmızı Takıma Geçir'}
-                  </span>
-                </button>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-semibold text-slate-400 block mb-1">
-                  Sahadaki Mevkisini Değiştir
-                </label>
-                <div className="grid grid-cols-5 gap-1">
-                  {(['Kaleci', 'Defans', 'Orta saha', 'Kanat', 'Forvet'] as Position[]).map(pos => {
-                    const currentPos = (pitchPlayerModal.team === 'teamA'
-                      ? activeMatch.teamA.players
-                      : activeMatch.teamB.players
-                    ).find(p => p.playerId === pitchPlayerModal.playerId)?.position;
-
-                    const isCurrent = currentPos === pos;
-
-                    return (
-                      <button
-                        key={pos}
-                        onClick={() => {
-                          updatePlayerPositionInTeam(
-                            pitchPlayerModal.playerId,
-                            pitchPlayerModal.team,
-                            pos,
-                            activeMatch.id
-                          );
-                          setPitchPlayerModal(null);
-                        }}
-                        className={`py-2 px-1 rounded-xl text-[10px] font-bold border transition-all ${
-                          isCurrent
-                            ? 'bg-emerald-600 border-emerald-400 text-white shadow-sm'
-                            : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
-                        }`}
-                      >
-                        {pos.slice(0, 3)}
-                      </button>
-                    );
-                  })}
+        return (
+          <div
+            onClick={() => setPitchPlayerModal(null)}
+            className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200 select-none"
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              className="bg-slate-900 border border-emerald-500/50 rounded-3xl max-w-sm w-full p-5 shadow-2xl space-y-4 animate-in slide-in-from-bottom"
+            >
+              {/* Modal Top Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center space-x-2.5">
+                  <div
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs shadow-md ${
+                      isTeamA
+                        ? 'bg-rose-600 shadow-rose-600/30'
+                        : 'bg-blue-600 shadow-blue-600/30'
+                    }`}
+                  >
+                    {isTeamA ? '🔴' : '🔵'}
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-emerald-400 block tracking-wider">
+                      {teamLabel} • SAHA İÇİ MEVKİ
+                    </span>
+                    <h3 className="text-base font-black text-white">
+                      {pObj?.name || 'Oyuncu'}
+                    </h3>
+                  </div>
                 </div>
-              </div>
-
-              <div className="pt-1">
                 <button
-                  onClick={() => {
-                    assignPlayerToTeam(pitchPlayerModal.playerId, 'bench', undefined, activeMatch.id);
-                    setPitchPlayerModal(null);
-                  }}
-                  className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-rose-400 font-bold text-xs"
+                  onClick={() => setPitchPlayerModal(null)}
+                  className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
                 >
-                  Kadro Dışına / Yedeğe Al
+                  ✕
                 </button>
               </div>
+
+              {/* Status & Finalized Notice */}
+              {isFinalized && (
+                <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-between text-xs text-amber-200">
+                  <span className="flex items-center space-x-1">
+                    <Lock className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Kadro kilitlidir.</span>
+                  </span>
+                  {isAdmin && (
+                    <button
+                      onClick={() => toggleSquadLock(activeMatch.id)}
+                      className="px-2 py-0.5 rounded bg-amber-500 text-black font-bold text-[10px]"
+                    >
+                      Kilidi Aç
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* If user CAN manage squad */}
+              {canManage ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-400 block mb-1">
+                      Takım Değiştir
+                    </label>
+                    <button
+                      onClick={() => {
+                        const targetTeam = isTeamA ? 'teamB' : 'teamA';
+                        assignPlayerToTeam(pitchPlayerModal.playerId, targetTeam, undefined, activeMatch.id);
+                        setPitchPlayerModal(null);
+                      }}
+                      className={`w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-all active:scale-95 ${
+                        isTeamA
+                          ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/20'
+                          : 'bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-600/20'
+                      }`}
+                    >
+                      <ArrowLeftRight className="w-4 h-4" />
+                      <span>{isTeamA ? 'Mavi Takıma Geçir' : 'Kırmızı Takıma Geçir'}</span>
+                    </button>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-400 block mb-1">
+                      Sahadaki Mevkisini Değiştir
+                    </label>
+                    <div className="grid grid-cols-5 gap-1">
+                      {(['Kaleci', 'Defans', 'Orta saha', 'Kanat', 'Forvet'] as Position[]).map(pos => {
+                        const isCurrent = currentPos === pos;
+
+                        return (
+                          <button
+                            key={pos}
+                            onClick={() => {
+                              updatePlayerPositionInTeam(
+                                pitchPlayerModal.playerId,
+                                pitchPlayerModal.team,
+                                pos,
+                                activeMatch.id
+                              );
+                              setPitchPlayerModal(null);
+                            }}
+                            className={`py-2 px-1 rounded-xl text-[10px] font-bold border transition-all active:scale-95 ${
+                              isCurrent
+                                ? 'bg-emerald-600 border-emerald-400 text-white shadow-sm'
+                                : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                            }`}
+                          >
+                            {pos.slice(0, 3)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button
+                      onClick={() => {
+                        setSelectedPlayerToSwap({
+                          playerId: pitchPlayerModal.playerId,
+                          team: pitchPlayerModal.team,
+                        });
+                        setPitchPlayerModal(null);
+                      }}
+                      className="py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-300 font-bold text-xs flex items-center justify-center space-x-1 transition-all active:scale-95"
+                    >
+                      <ArrowLeftRight className="w-3.5 h-3.5" />
+                      <span>Takas Et</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        assignPlayerToTeam(pitchPlayerModal.playerId, 'bench', undefined, activeMatch.id);
+                        setPitchPlayerModal(null);
+                      }}
+                      className="py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-rose-400 font-bold text-xs transition-all active:scale-95"
+                    >
+                      Yedeğe Al
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Non-admin / Guest view: shows info & fast login button */
+                <div className="space-y-3">
+                  <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1.5 text-xs">
+                    <div className="flex justify-between text-slate-400">
+                      <span>Mevcut Takım:</span>
+                      <span className="font-bold text-white">{teamLabel}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-400">
+                      <span>Mevki:</span>
+                      <span className="font-bold text-emerald-400">{currentPos}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-400">
+                      <span>Katılım Durumu:</span>
+                      <span className="font-bold text-white">Geliyor ✓</span>
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-slate-400 leading-relaxed text-center">
+                    Kadroda takım veya mevki değişikliği yapmak için Yönetici veya Konsey girişi gereklidir.
+                  </p>
+
+                  <button
+                    onClick={() => {
+                      setPitchPlayerModal(null);
+                      setShowAuthModal(true);
+                    }}
+                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-black text-xs shadow-lg shadow-amber-500/25 flex items-center justify-center space-x-1.5 transition-all active:scale-95"
+                  >
+                    <Crown className="w-4 h-4 text-black" />
+                    <span>Yönetici / Konsey Girişi Yap</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* SQUAD VISUAL CARD MODAL */}
       {showVisualCardModal && (
         <SquadVisualCardModal
           match={activeMatch}
           onClose={() => setShowVisualCardModal(false)}
+        />
+      )}
+
+      {/* AUTH ROLE MODAL (Yöneticiye Geçiş) */}
+      {showAuthModal && (
+        <AuthRoleModal
+          defaultTab="admin"
+          onClose={() => setShowAuthModal(false)}
         />
       )}
     </div>
