@@ -31,28 +31,28 @@ export const Header: React.FC<HeaderProps> = ({ onOpenFirebaseModal }) => {
       : 'Misafir';
 
   return (
-    <header className="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-3 sm:px-4 py-2.5 sm:py-3">
-      <div className="max-w-md mx-auto flex items-center justify-between">
+    <header className="sticky top-0 z-30 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 px-2.5 sm:px-4 py-2 sm:py-2.5">
+      <div className="max-w-xl mx-auto flex items-center justify-between gap-1 sm:gap-2">
         {/* Logo & Match Week */}
-        <div className="flex items-center space-x-2">
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-green-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
+        <div className="flex items-center space-x-2 shrink-0">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-green-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
             <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
           </div>
           <div>
             <div className="flex items-center space-x-1.5">
-              <span className="font-black tracking-tight text-white text-sm sm:text-base">HALISAHA</span>
-              <span className="text-[10px] sm:text-xs font-bold px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+              <span className="font-black tracking-tight text-white text-xs sm:text-base">HALISAHA</span>
+              <span className="text-[9px] sm:text-xs font-bold px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                 PRO
               </span>
             </div>
-            <p className="text-[10px] sm:text-xs text-slate-400 font-medium">
-              {currentMatch.matchNumber}. Hafta • {roleLabel} Modu
+            <p className="text-[9px] sm:text-xs text-slate-400 font-medium truncate max-w-[110px] sm:max-w-none">
+              {currentMatch.matchNumber}. Hafta • {roleLabel}
             </p>
           </div>
         </div>
 
         {/* User Role Switcher, Notification Bell & Firebase Status */}
-        <div className="flex items-center space-x-1 sm:space-x-1.5">
+        <div className="flex items-center space-x-1 sm:space-x-1.5 shrink-0">
           {/* Quick "Yöneticiye Geç" Button for Guests & Players */}
           {!isCouncil && (
             <button
@@ -60,8 +60,8 @@ export const Header: React.FC<HeaderProps> = ({ onOpenFirebaseModal }) => {
                 setAuthDefaultTab('admin');
                 setShowAuthModal(true);
               }}
-              title="Yönetici (Konsey) Girişine Geç"
-              className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black text-xs font-black shadow-lg shadow-amber-500/25 transition-all active:scale-95 shrink-0 border border-amber-300 animate-pulse"
+              title="Yönetici (Konsey) Bildirim Perdesini İndir"
+              className="flex items-center space-x-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black text-xs font-black shadow-lg shadow-amber-500/25 transition-all active:scale-95 shrink-0 border border-amber-300 animate-pulse"
             >
               <Crown className="w-3.5 h-3.5 text-black shrink-0" />
               <span>Yöneticiye Geç</span>
@@ -74,8 +74,8 @@ export const Header: React.FC<HeaderProps> = ({ onOpenFirebaseModal }) => {
               setAuthDefaultTab(isCouncil ? 'guest' : 'admin');
               setShowAuthModal(true);
             }}
-            title="Kullanıcı Girişi ve Rolleri Yönet"
-            className={`flex items-center space-x-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all active:scale-95 shadow-sm ${
+            title="Kullanıcı Girişi ve Rolleri Yönet (Bildirim Perdesi)"
+            className={`flex items-center space-x-1 sm:space-x-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all active:scale-95 shadow-sm shrink-0 ${
               currentUser.role === 'admin'
                 ? 'bg-gradient-to-r from-amber-950/80 to-slate-900 border-amber-500/40 text-amber-300 hover:border-amber-400'
                 : currentUser.role === 'council_member'
