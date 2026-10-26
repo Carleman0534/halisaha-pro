@@ -40,6 +40,8 @@ import { WeatherWidget } from '../common/WeatherWidget';
 import { MvpVotingModal } from './MvpVotingModal';
 import { LeaderboardModal } from './LeaderboardModal';
 import { MatchResultsModal } from './MatchResultsModal';
+import { WhatsAppDebtReminderModal } from '../finance/WhatsAppDebtReminderModal';
+import { SquadVisualCardModal } from '../squad/SquadVisualCardModal';
 
 interface EmergencySubstituteFinderProps {
   onNavigateToSquad?: () => void;
@@ -71,6 +73,8 @@ export const EmergencySubstituteFinder: React.FC<EmergencySubstituteFinderProps>
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showMvpModal, setShowMvpModal] = useState(false);
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
+  const [showDebtReminderModal, setShowDebtReminderModal] = useState(false);
+  const [showVisualCardModal, setShowVisualCardModal] = useState(false);
   const [showResultsModal, setShowResultsModal] = useState(false);
   const [copiedBroadcast, setCopiedBroadcast] = useState(false);
   const [selectedPositionFilter, setSelectedPositionFilter] = useState<string>('all');
@@ -655,22 +659,19 @@ ${generalDecline}
           </button>
 
           <button
-            onClick={() => setShowCalendarModal(true)}
-            className="flex items-center justify-center space-x-1.5 py-2 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-xs transition-all active:scale-95"
+            onClick={() => setShowVisualCardModal(true)}
+            className="flex items-center justify-center space-x-1.5 py-2 px-2 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-black text-xs shadow-md shadow-emerald-600/20 transition-all active:scale-95"
           >
-            <Calendar className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Takvim</span>
+            <span>📸 Görsel Kadro</span>
           </button>
 
-          {onNavigateToSquad && (
-            <button
-              onClick={onNavigateToSquad}
-              className="flex items-center justify-center space-x-1 py-2 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-xs transition-all active:scale-95"
-            >
-              <span>Dizilim</span>
-              <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
-            </button>
-          )}
+          <button
+            onClick={() => setShowDebtReminderModal(true)}
+            className="flex items-center justify-center space-x-1.5 py-2 px-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-black font-black text-xs shadow-md shadow-amber-500/20 transition-all active:scale-95"
+          >
+            <Wallet className="w-3.5 h-3.5 text-black" />
+            <span>💬 Kasa Hatırlat</span>
+          </button>
         </div>
 
         {/* 2nd Row: Skor, MVP Oylaması, Gol Krallığı */}
@@ -849,11 +850,11 @@ ${generalDecline}
             </button>
 
             <button
-              onClick={openMatchIbanGroupWhatsApp}
+              onClick={() => setShowDebtReminderModal(true)}
               className="flex-1 sm:flex-initial flex items-center justify-center space-x-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold shadow-md shadow-emerald-600/20 transition-all active:scale-95"
             >
               <Share2 className="w-3.5 h-3.5" />
-              <span>Gruba IBAN & Kasa At</span>
+              <span>💬 Gruba Kasa & Borç At</span>
             </button>
           </div>
         </div>
@@ -1512,6 +1513,22 @@ ${generalDecline}
             </button>
           </div>
         </div>
+      )}
+
+      {/* WHATSAPP DEBT REMINDER MODAL */}
+      {showDebtReminderModal && (
+        <WhatsAppDebtReminderModal
+          match={currentMatch}
+          onClose={() => setShowDebtReminderModal(false)}
+        />
+      )}
+
+      {/* SQUAD VISUAL CARD MODAL */}
+      {showVisualCardModal && (
+        <SquadVisualCardModal
+          match={currentMatch}
+          onClose={() => setShowVisualCardModal(false)}
+        />
       )}
     </div>
   );

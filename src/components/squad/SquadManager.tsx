@@ -33,6 +33,7 @@ import { useApp } from '../../context/AppContext';
 import { generateWhatsAppShareText } from '../../utils/calculations';
 import { Position, SquadVersion } from '../../types';
 import { canViewRoster, canViewRatings } from '../../utils/permissions';
+import { SquadVisualCardModal } from './SquadVisualCardModal';
 
 export const SquadManager: React.FC = () => {
   const {
@@ -63,6 +64,7 @@ export const SquadManager: React.FC = () => {
   const [saveToast, setSaveToast] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'pitch' | 'manualTeam' | 'poolSelect'>('pitch');
   const [showVersionHistoryModal, setShowVersionHistoryModal] = useState(false);
+  const [showVisualCardModal, setShowVisualCardModal] = useState(false);
 
   // Selected week match ID for week switching
   const [selectedMatchId, setSelectedMatchId] = useState<string>(currentMatch.id);
@@ -697,12 +699,11 @@ export const SquadManager: React.FC = () => {
             <span>WhatsApp Metni</span>
           </button>
           <button
-            onClick={handleExportSquadImage}
-            disabled={isExportingImage}
-            className="flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-blue-600/20 transition-all active:scale-95"
+            onClick={() => setShowVisualCardModal(true)}
+            className="flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-black text-xs shadow-lg shadow-emerald-600/25 transition-all active:scale-95"
           >
-            <Camera className="w-4 h-4" />
-            <span>{isExportingImage ? 'Hazırlanıyor...' : '📸 Kadro Resmi (PNG)'}</span>
+            <Camera className="w-4 h-4 text-emerald-200" />
+            <span>📸 Görsel Kadro Kartı (WP)</span>
           </button>
         </div>
       </div>
@@ -1382,6 +1383,14 @@ export const SquadManager: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* SQUAD VISUAL CARD MODAL */}
+      {showVisualCardModal && (
+        <SquadVisualCardModal
+          match={activeMatch}
+          onClose={() => setShowVisualCardModal(false)}
+        />
       )}
     </div>
   );

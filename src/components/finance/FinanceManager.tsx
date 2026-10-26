@@ -23,6 +23,7 @@ import confetti from 'canvas-confetti';
 import { useApp } from '../../context/AppContext';
 import { Player, PaymentExemption, ExemptionAuditLog } from '../../types';
 import { QrPaymentModal } from './QrPaymentModal';
+import { WhatsAppDebtReminderModal } from './WhatsAppDebtReminderModal';
 import { calculateMatchFinancials, isPlayerExemptForMatch } from '../../utils/permissions';
 
 export const FinanceManager: React.FC = () => {
@@ -55,6 +56,7 @@ export const FinanceManager: React.FC = () => {
   const [showGeneralQr, setShowGeneralQr] = useState(false);
   const [showEditBankModal, setShowEditBankModal] = useState(false);
   const [showExemptionAuditModal, setShowExemptionAuditModal] = useState(false);
+  const [showDebtReminderModal, setShowDebtReminderModal] = useState(false);
 
   // Exemption Modal State
   const [exemptionPlayer, setExemptionPlayer] = useState<Player | null>(null);
@@ -375,7 +377,15 @@ export const FinanceManager: React.FC = () => {
         </div>
 
         {/* Action Buttons: WhatsApp Debt Broadcast */}
-        <div className="grid grid-cols-2 gap-2 pt-1">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+          <button
+            onClick={() => setShowDebtReminderModal(true)}
+            className="flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-green-500 hover:from-emerald-500 hover:to-green-400 text-white font-black text-xs shadow-lg shadow-emerald-600/25 transition-all active:scale-95"
+          >
+            <MessageCircle className="w-4 h-4" />
+            <span>💬 WhatsApp Kasa & Borç Şablonu</span>
+          </button>
+
           <button
             onClick={handleCopyDebtBroadcast}
             className="flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold text-xs transition-all active:scale-95"
@@ -386,10 +396,10 @@ export const FinanceManager: React.FC = () => {
 
           <button
             onClick={handleOpenDebtWhatsApp}
-            className="flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 transition-all active:scale-95"
+            className="flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 font-bold text-xs transition-all active:scale-95"
           >
             <Share2 className="w-3.5 h-3.5" />
-            <span>Gruba Hatırlat (WP)</span>
+            <span>Hızlı WP At</span>
           </button>
         </div>
       </div>
@@ -917,6 +927,14 @@ export const FinanceManager: React.FC = () => {
           matchNumber={currentMatch.matchNumber}
           onClose={() => setSelectedPlayerForQr(null)}
           onMarkPaid={() => togglePayment(selectedPlayerForQr.id, activeMatch.id)}
+        />
+      )}
+
+      {/* WHATSAPP DEBT REMINDER MODAL */}
+      {showDebtReminderModal && (
+        <WhatsAppDebtReminderModal
+          match={activeMatch}
+          onClose={() => setShowDebtReminderModal(false)}
         />
       )}
     </div>
