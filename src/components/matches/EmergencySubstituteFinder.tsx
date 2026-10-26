@@ -391,18 +391,30 @@ ${
   };
 
   const handleSendOneDayBroadcast = () => {
+    const origin = typeof window !== 'undefined' ? window.location.origin + window.location.pathname : '';
+    const generalConfirm = `${origin}?action=confirm`;
+    const generalDecline = `${origin}?action=decline`;
+
     const gelenlerLines = categorizedPlayers.geliyor
       .map((p, idx) => `${idx + 1}. ${p.name} (${p.primaryPosition})`)
       .join('\n');
 
-    const text = encodeURIComponent(`⏰ *YARIN MAÇ GÜNÜ! (SON TEYİT & HATIRLATMA)* ⏰
+    const text = encodeURIComponent(`⏰ *YARIN MAÇ GÜNÜ! (SON KATILIM TEYİDİ & HATIRLATMA)* ⏰
 📅 *Tarih:* Yarın (${dateFormatted}) | ${currentMatch.time}
 📍 *Saha:* ${currentMatch.venueName} (${currentMatch.pitchNo})
-👥 *Kadro:* ${comingCount}/${targetCount} Kişi Onayladı
+👥 *Kadro Durumu:* ${comingCount}/${targetCount} Kişi Onayladı
 💰 *Kişi Başı Ücret:* ${currentMatch.costPerPlayer} ₺
 
 ✅ *KESİNLEŞEN KADRO:*
 ${gelenlerLines || '(Henüz kadro kesinleşmedi)'}
+
+👇 *Lütfen katılım durumunu aşağıdaki linklerden son kez ONAYLA:*
+
+🟢 *[ONAYLIYORUM (MAÇA GELİYORUM)]:*
+${generalConfirm}
+
+🔴 *[GELMİYORUM (İPTAL)]:*
+${generalDecline}
 
 ⚠️ *ÖNEMLİ KURAL:* Son dakika iptalleri takımları eksik bırakır. Yarın gelemeyecek olanların BU AKŞAMDAN bildirmesi zorunludur! Herkes vaktinde sahada olsun. ⚽🔥`);
 
