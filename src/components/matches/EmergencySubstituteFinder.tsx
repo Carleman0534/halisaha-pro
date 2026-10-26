@@ -548,7 +548,7 @@ ${generalDecline}
           </div>
 
           <div className="flex items-center space-x-1.5">
-            {isAdmin && (
+            {(isAdmin || isCouncil) && (
               <>
                 <button
                   onClick={() => setShowEditMatchModal('edit')}
@@ -941,8 +941,8 @@ ${generalDecline}
         </div>
       )}
 
-      {/* DECLINE ALERTS BANNER FOR ADMIN (Rule 3.3) */}
-      {isAdmin && currentMatch.adminDeclineAlerts && currentMatch.adminDeclineAlerts.filter(a => !a.read).length > 0 && (
+      {/* DECLINE ALERTS BANNER FOR ADMIN/COUNCIL (Rule 3.3) */}
+      {(isAdmin || isCouncil) && currentMatch.adminDeclineAlerts && currentMatch.adminDeclineAlerts.filter(a => !a.read).length > 0 && (
         <div className="p-3.5 rounded-2xl bg-gradient-to-r from-rose-950/70 via-slate-900 to-slate-900 border border-rose-500/50 shadow-xl space-y-2 animate-in fade-in">
           <div className="flex items-center justify-between">
             <span className="text-xs font-black text-rose-300 flex items-center space-x-1.5">
@@ -994,7 +994,7 @@ ${generalDecline}
         </div>
 
         {/* Re-notification Button for Pending Players (Rule 3.4) */}
-        {isAdmin && categorizedPlayers.bekleniyor.length > 0 && (
+        {(isAdmin || isCouncil) && categorizedPlayers.bekleniyor.length > 0 && (
           <button
             onClick={handleTriggerReNotification}
             disabled={isSendingReNotify}

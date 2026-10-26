@@ -5,6 +5,7 @@ import {
   isPlayerExemptForMatch,
   calculateMatchFinancials,
 } from '../src/utils/permissions.ts';
+import { balanceTeams } from '../src/utils/calculations.ts';
 import { RAW_PLAYERS_DATA, ADMIN_USERS, INITIAL_MATCH } from '../src/data/initialData.ts';
 import { AppUser, Match, Player, Team } from '../src/types/index.ts';
 
@@ -179,6 +180,29 @@ const teamBIds = ['p4', 'p5', 'p1']; // 'p1' deliberately duplicate
 const setA = new Set(teamAIds);
 const cleanedB = teamBIds.filter(id => !setA.has(id));
 assert(cleanedB.length === 2 && !cleanedB.includes('p1'), 'Aynı oyuncunun iki takıma birden atanması engellendi');
+
+// ----------------------------------------------------
+// TEST 6: MAÇ FORMATLARI (5v5, 6v6, 7v7, 8v8) VE TAKIM DENGE HESAPLAMALARI
+// ----------------------------------------------------
+console.log('\n⚽ Test 6: Maç Formatları & Takım Dağılımı');
+const targetMap: Record<string, number> = { '5v5': 10, '6v6': 12, '7v7': 14, '8v8': 16 };
+const totalPitchCost = 2800;
+
+assert(targetMap['5v5'] === 10, '5v5 hedef kadro 10 kişidir');
+assert(Math.round(totalPitchCost / targetMap['5v5']) === 280, '5v5 kişi başı ücret: 280 TL');
+assert(targetMap['6v6'] === 12, '6v6 hedef kadro 12 kişidir');
+assert(Math.round(totalPitchCost / targetMap['6v6']) === 233, '6v6 kişi başı ücret: 233 TL');
+assert(targetMap['7v7'] === 14, '7v7 hedef kadro 14 kişidir');
+assert(Math.round(totalPitchCost / targetMap['7v7']) === 200, '7v7 kişi başı ücret: 200 TL');
+assert(targetMap['8v8'] === 16, '8v8 hedef kadro 16 kişidir');
+assert(Math.round(totalPitchCost / targetMap['8v8']) === 175, '8v8 kişi başı ücret: 175 TL');
+
+// Test 5v5 balance sizing
+const mock10Squad = mockSquad.slice(0, 10);
+const balanced5v5 = balanceTeams(mock10Squad, mockPlayersMap);
+assert(balanced5v5.teamA.players.length === 5, `5v5 Takım A oyuncu sayısı 5 (Mevcut: ${balanced5v5.teamA.players.length})`);
+assert(balanced5v5.teamB.players.length === 5, `5v5 Takım B oyuncu sayısı 5 (Mevcut: ${balanced5v5.teamB.players.length})`);
+assert(balanced5v5.teamB.name === 'Mavi Takım', `Takım B adı Mavi Takım olarak tutarlı (Mevcut: ${balanced5v5.teamB.name})`);
 
 console.log('\n====================================================');
 console.log(`📊 TEST SONUCU: ${passed} Başarılı, ${failed} Hatalı`);

@@ -43,6 +43,7 @@ export const WeeklyArchiveManager: React.FC<WeeklyArchiveManagerProps> = ({ onNa
     updateAttendance,
     updateMatchAttendance,
     isAdmin,
+    isCouncil,
   } = useApp();
 
   // Combine current active match and all archived past matches
@@ -577,7 +578,7 @@ export const WeeklyArchiveManager: React.FC<WeeklyArchiveManagerProps> = ({ onNa
                     </div>
 
                     <div className="flex items-center space-x-1.5">
-                      {isAdmin && (
+                      {(isAdmin || isCouncil) && (
                         <>
                           <button
                             onClick={() => updateMatchAttendance(selectedMatch.id, player.id, 'Geliyor')}
@@ -640,7 +641,7 @@ export const WeeklyArchiveManager: React.FC<WeeklyArchiveManagerProps> = ({ onNa
                         </span>
                       </div>
 
-                      {isAdmin && onNavigateToSquad && (
+                      {(isAdmin || isCouncil) && onNavigateToSquad && (
                         <button
                           onClick={onNavigateToSquad}
                           className="px-2 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold text-[10px] flex items-center space-x-1"

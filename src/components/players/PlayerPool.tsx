@@ -81,7 +81,7 @@ export const PlayerPool: React.FC = () => {
           <span>Davet</span>
         </button>
 
-        {isAdmin && (
+        {(isAdmin || isCouncil) && (
           <>
             <button
               onClick={() => setShowDisciplineModal(true)}
