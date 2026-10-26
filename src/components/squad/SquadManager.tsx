@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   Wand2,
   Share2,
@@ -15,6 +15,9 @@ import {
   Camera,
   Download,
   Image as ImageIcon,
+  Calendar,
+  Trophy,
+  Sparkles,
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import confetti from 'canvas-confetti';
@@ -25,9 +28,11 @@ import { Position } from '../../types';
 export const SquadManager: React.FC = () => {
   const {
     currentMatch,
+    pastMatches,
     players,
     playersMap,
     autoBalanceSquad,
+    syncSquadFromAttendees,
     updateSquad,
     setMatchFormat,
     assignPlayerToTeam,
@@ -38,7 +43,15 @@ export const SquadManager: React.FC = () => {
   } = useApp();
 
   const [copiedToast, setCopiedToast] = useState(false);
+  const [syncToast, setSyncToast] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'pitch' | 'manualTeam' | 'poolSelect'>('pitch');
+
+  // Selected week match ID for week switching
+  const [selectedMatchId, setSelectedMatchId] = useState<string>(currentMatch.id);
+  const isViewingCurrent = selectedMatchId === currentMatch.id;
+  const activeMatch = isViewingCurrent
+    ? currentMatch
+    : (pastMatches.find(m => m.id === selectedMatchId) || currentMatch);
 
   // Selected player on pitch for tactical customization
   const [pitchPlayerModal, setPitchPlayerModal] = useState<{
@@ -51,12 +64,38 @@ export const SquadManager: React.FC = () => {
     team: 'teamA' | 'teamB';
   } | null>(null);
 
+  // Attendees who marked 'Geliyor' or 'Geldi' for the upcoming match
+  const comingCount = useMemo(() => {
+    return Object.values(currentMatch.attendance || {}).filter(
+      st => st === 'Geliyor' || st === 'Geldi'
+    ).length;
+  }, [currentMatch.attendance]);
+
+  const handleSyncAttendees = () => {
+    if (!isAdmin) return;
+    const res = syncSquadFromAttendees();
+    if (res.success) {
+      try {
+        confetti({
+          particleCount: 50,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#10b981', '#3b82f6', '#f59e0b'],
+        });
+      } catch {}
+      setSyncToast(`🎉 Kadro, bu haftanın teyit veren ${res.count} oyuncusundan başarıyla oluşturuldu ve dengelendi!`);
+      setTimeout(() => setSyncToast(null), 4000);
+    } else {
+      alert(res.message || 'Gelen oyuncu bulunamadı.');
+    }
+  };
+
   // Active match format (default 7v7, 14 players)
-  const currentFormat = currentMatch.matchFormat || '7v7';
-  const targetCount = currentMatch.targetSquadCount || (currentFormat === '5v5' ? 10 : currentFormat === '6v6' ? 12 : currentFormat === '8v8' ? 16 : 14);
+  const currentFormat = activeMatch.matchFormat || '7v7';
+  const targetCount = activeMatch.targetSquadCount || (currentFormat === '5v5' ? 10 : currentFormat === '6v6' ? 12 : currentFormat === '8v8' ? 16 : 14);
   const perTeamTarget = Math.round(targetCount / 2);
 
-  const powerDiff = Math.abs(currentMatch.teamA.totalPower - currentMatch.teamB.totalPower).toFixed(1);
+  const powerDiff = Math.abs(activeMatch.teamA.totalPower - activeMatch.teamB.totalPower).toFixed(1);
 
   // Available formations depending on format
   const getFormationsForFormat = (fmt: string) => {
@@ -74,11 +113,14 @@ export const SquadManager: React.FC = () => {
   };
 
   const formations = getFormationsForFormat(currentFormat);
-  const teamAFormation = currentMatch.teamA.formation || formations[0];
-  const teamBFormation = currentMatch.teamB.formation || formations[0];
+  const teamAFormation = activeMatch.teamA.formation || formations[0];
+  const teamBFormation = activeMatch.teamB.formation || formations[0];
 
   // Auto balance trigger
   const handleAutoBalance = () => {
+    if (!isViewingCurrent) {
+      setSelectedMatchId(currentMatch.id);
+    }
     autoBalanceSquad();
     try {
       confetti({
@@ -92,7 +134,7 @@ export const SquadManager: React.FC = () => {
 
   // WhatsApp share
   const handleShareWhatsApp = () => {
-    const text = generateWhatsAppShareText(currentMatch, playersMap);
+    const text = generateWhatsAppShareText(activeMatch, playersMap);
     navigator.clipboard.writeText(text);
     setCopiedToast(true);
     setTimeout(() => setCopiedToast(false), 3000);
@@ -116,12 +158,12 @@ export const SquadManager: React.FC = () => {
       try {
         const res = await fetch(dataUrl);
         const blob = await res.blob();
-        const file = new File([blob], `halisaha-kadro-${currentMatch.date}.png`, { type: 'image/png' });
+        const file = new File([blob], `halisaha-kadro-${activeMatch.date}.png`, { type: 'image/png' });
 
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           await navigator.share({
             title: `⚽ Halı Saha Kadro Dizilimi (${currentFormat})`,
-            text: `⚽ *${currentMatch.venueName} | ${currentMatch.time}*\nKırmızı Takım vs Mavi Takım Kadro Dizilimi!`,
+            text: `⚽ *${activeMatch.venueName} | ${activeMatch.time}*\nKırmızı Takım vs Mavi Takım Kadro Dizilimi!`,
             files: [file],
           });
           confetti({ particleCount: 35, spread: 60, origin: { y: 0.7 } });
@@ -133,7 +175,7 @@ export const SquadManager: React.FC = () => {
 
       // Download file fallback
       const link = document.createElement('a');
-      link.download = `halisaha-kadro-${currentMatch.date}.png`;
+      link.download = `halisaha-kadro-${activeMatch.date}.png`;
       link.href = dataUrl;
       link.click();
       confetti({ particleCount: 35, spread: 60, origin: { y: 0.7 } });
@@ -206,6 +248,108 @@ export const SquadManager: React.FC = () => {
         </div>
       )}
 
+      {syncToast && (
+        <div className="fixed top-16 left-1/2 transform -translate-x-1/2 z-50 bg-emerald-600 text-white px-4 py-2.5 rounded-2xl font-bold text-xs shadow-2xl flex items-center space-x-2 border border-emerald-400 animate-in fade-in slide-in-from-top max-w-sm text-center">
+          <Sparkles className="w-4 h-4 text-amber-300 shrink-0" />
+          <span>{syncToast}</span>
+        </div>
+      )}
+
+      {/* HAFTA SEÇİCİ (WEEK SELECTOR) */}
+      <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center space-x-1.5">
+            <Calendar className="w-4 h-4 text-emerald-400" />
+            <span>Haftalık Kadro Seçici</span>
+          </span>
+          <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-lg border border-slate-700">
+            {isViewingCurrent ? '🔥 Önümüzdeki Maç' : '📚 Geçmiş Hafta'}
+          </span>
+        </div>
+
+        <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-slate-700">
+          <button
+            onClick={() => setSelectedMatchId(currentMatch.id)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center space-x-1.5 ${
+              isViewingCurrent
+                ? 'bg-emerald-600 border border-emerald-400 text-white shadow-md shadow-emerald-600/30'
+                : 'bg-slate-800/80 border border-slate-700/60 text-slate-300 hover:text-white'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" />
+            <span>{currentMatch.matchNumber}. Hafta (Önümüzdeki Maç)</span>
+          </button>
+
+          {pastMatches.map(m => (
+            <button
+              key={m.id}
+              onClick={() => setSelectedMatchId(m.id)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center space-x-1.5 ${
+                selectedMatchId === m.id
+                  ? 'bg-amber-600 border border-amber-400 text-white shadow-md shadow-amber-600/30'
+                  : 'bg-slate-800/80 border border-slate-700/60 text-slate-300 hover:text-white'
+              }`}
+            >
+              <span>{m.matchNumber}. Hafta</span>
+              <span className="text-[10px] opacity-75">
+                ({new Date(m.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })})
+              </span>
+              {m.status === 'completed' && <span className="text-[10px]">🏆</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* IF VIEWING PAST MATCH: ARCHIVE BANNER */}
+      {!isViewingCurrent && (
+        <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-between text-xs text-amber-200">
+          <div className="flex items-center space-x-2">
+            <Trophy className="w-4 h-4 text-amber-400 shrink-0" />
+            <div>
+              <span className="font-bold text-white block">
+                {activeMatch.matchNumber}. Hafta Geçmiş Maç Kadrosu ({activeMatch.date})
+              </span>
+              <span>
+                Skor: <strong className="text-white">{activeMatch.teamA.score ?? 0} - {activeMatch.teamB.score ?? 0}</strong>
+                {activeMatch.mvpWinnerId && playersMap[activeMatch.mvpWinnerId] && (
+                  <span className="ml-1.5 text-amber-300">• MVP: ⭐ {playersMap[activeMatch.mvpWinnerId].name}</span>
+                )}
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={() => setSelectedMatchId(currentMatch.id)}
+            className="px-2.5 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] shrink-0 active:scale-95 transition-all"
+          >
+            Önümüzdeki Maça Dön
+          </button>
+        </div>
+      )}
+
+      {/* IF VIEWING CURRENT MATCH: GELENLERDEN KADRO ÇEK CARD */}
+      {isViewingCurrent && (
+        <div className="p-3.5 bg-gradient-to-r from-emerald-950/70 via-slate-900 to-slate-900 border border-emerald-500/30 rounded-2xl flex items-center justify-between shadow-lg">
+          <div>
+            <span className="text-xs font-black text-white flex items-center space-x-1.5">
+              <UserCheck className="w-4 h-4 text-emerald-400" />
+              <span>{currentMatch.matchNumber}. Hafta Gelenleri ({comingCount} Kişi)</span>
+            </span>
+            <span className="text-[10px] text-slate-400 block mt-0.5">
+              Yoklamada 'Geliyor' teyidi veren {comingCount} oyuncudan kadroyu çek & otomatik dengele
+            </span>
+          </div>
+
+          <button
+            onClick={handleSyncAttendees}
+            disabled={!isAdmin}
+            className="px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black font-black text-xs shadow-md shadow-emerald-500/20 flex items-center space-x-1.5 active:scale-95 transition-all shrink-0 ml-2"
+          >
+            <Wand2 className="w-3.5 h-3.5" />
+            <span>Gelenlerden Kadro Çek ({comingCount})</span>
+          </button>
+        </div>
+      )}
+
       {/* Guest Mode Notice */}
       {!isAdmin && (
         <div className="flex items-center space-x-2.5 p-3 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs">
@@ -225,7 +369,7 @@ export const SquadManager: React.FC = () => {
             <span>Haftalık Maç Formatı (Kaça Kaç)</span>
           </span>
           <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-            Kişi Başı: {currentMatch.costPerPlayer} ₺
+            Kişi Başı: {activeMatch.costPerPlayer} ₺
           </span>
         </div>
 
@@ -287,14 +431,14 @@ export const SquadManager: React.FC = () => {
             <span className="text-rose-400 flex items-center space-x-1">
               <span className="w-2 h-2 rounded-full bg-rose-500" />
               <span>
-                {currentMatch.teamA.name} ({currentMatch.teamA.players.length}/{perTeamTarget}) •{' '}
-                {currentMatch.teamA.totalPower}p
+                {activeMatch.teamA.name} ({activeMatch.teamA.players.length}/{perTeamTarget}) •{' '}
+                {activeMatch.teamA.totalPower}p
               </span>
             </span>
             <span className="text-blue-400 flex items-center space-x-1">
               <span>
-                {currentMatch.teamB.name} ({currentMatch.teamB.players.length}/{perTeamTarget}) •{' '}
-                {currentMatch.teamB.totalPower}p
+                {activeMatch.teamB.name} ({activeMatch.teamB.players.length}/{perTeamTarget}) •{' '}
+                {activeMatch.teamB.totalPower}p
               </span>
               <span className="w-2 h-2 rounded-full bg-blue-500" />
             </span>
@@ -304,8 +448,8 @@ export const SquadManager: React.FC = () => {
               className="bg-rose-500 h-full transition-all duration-500"
               style={{
                 width: `${
-                  (currentMatch.teamA.totalPower /
-                    (currentMatch.teamA.totalPower + currentMatch.teamB.totalPower || 1)) *
+                  (activeMatch.teamA.totalPower /
+                    (activeMatch.teamA.totalPower + activeMatch.teamB.totalPower || 1)) *
                   100
                 }%`,
               }}
@@ -314,8 +458,8 @@ export const SquadManager: React.FC = () => {
               className="bg-blue-500 h-full transition-all duration-500"
               style={{
                 width: `${
-                  (currentMatch.teamB.totalPower /
-                    (currentMatch.teamA.totalPower + currentMatch.teamB.totalPower || 1)) *
+                  (activeMatch.teamB.totalPower /
+                    (activeMatch.teamA.totalPower + activeMatch.teamB.totalPower || 1)) *
                   100
                 }%`,
               }}
@@ -377,7 +521,7 @@ export const SquadManager: React.FC = () => {
               activeTab === 'poolSelect' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400 hover:text-white'
             }`}
           >
-            Havuz ({currentMatch.squad.length}/{targetCount})
+            Havuz ({activeMatch.squad.length}/{targetCount})
           </button>
         </div>
       )}
@@ -466,14 +610,14 @@ export const SquadManager: React.FC = () => {
             <div className="relative z-10 space-y-2">
               <div className="flex items-center justify-between px-2">
                 <span className="text-[11px] font-black uppercase text-rose-300 bg-rose-950/80 px-2 py-0.5 rounded border border-rose-500/30">
-                  {currentMatch.teamA.name} ({currentMatch.teamA.players.length}) • {teamAFormation}
+                  {activeMatch.teamA.name} ({activeMatch.teamA.players.length}) • {teamAFormation}
                 </span>
-                <span className="text-[10px] text-white/60">{isAdmin ? 'Dokunarak Yönet' : 'Salt Okunur'}</span>
+                <span className="text-[10px] text-white/60">{isAdmin && isViewingCurrent ? 'Dokunarak Yönet' : 'Salt Okunur'}</span>
               </div>
 
               {/* GK */}
               <div className="flex justify-center mb-1">
-                {currentMatch.teamA.players
+                {activeMatch.teamA.players
                   .filter(p => p.position === 'Kaleci')
                   .map(p => (
                     <PlayerPitchChip
@@ -490,7 +634,7 @@ export const SquadManager: React.FC = () => {
 
               {/* DEF */}
               <div className="flex justify-around px-4">
-                {currentMatch.teamA.players
+                {activeMatch.teamA.players
                   .filter(p => p.position === 'Defans')
                   .map(p => (
                     <PlayerPitchChip
@@ -507,7 +651,7 @@ export const SquadManager: React.FC = () => {
 
               {/* MID & WNG */}
               <div className="flex justify-around px-2">
-                {currentMatch.teamA.players
+                {activeMatch.teamA.players
                   .filter(p => p.position === 'Orta saha' || p.position === 'Kanat')
                   .map(p => (
                     <PlayerPitchChip
@@ -524,7 +668,7 @@ export const SquadManager: React.FC = () => {
 
               {/* FWD */}
               <div className="flex justify-around px-6">
-                {currentMatch.teamA.players
+                {activeMatch.teamA.players
                   .filter(p => p.position === 'Forvet')
                   .map(p => (
                     <PlayerPitchChip
@@ -551,7 +695,7 @@ export const SquadManager: React.FC = () => {
             <div className="relative z-10 space-y-2">
               {/* FWD */}
               <div className="flex justify-around px-6">
-                {currentMatch.teamB.players
+                {activeMatch.teamB.players
                   .filter(p => p.position === 'Forvet')
                   .map(p => (
                     <PlayerPitchChip
@@ -568,7 +712,7 @@ export const SquadManager: React.FC = () => {
 
               {/* MID & WNG */}
               <div className="flex justify-around px-2">
-                {currentMatch.teamB.players
+                {activeMatch.teamB.players
                   .filter(p => p.position === 'Orta saha' || p.position === 'Kanat')
                   .map(p => (
                     <PlayerPitchChip
@@ -585,7 +729,7 @@ export const SquadManager: React.FC = () => {
 
               {/* DEF */}
               <div className="flex justify-around px-4">
-                {currentMatch.teamB.players
+                {activeMatch.teamB.players
                   .filter(p => p.position === 'Defans')
                   .map(p => (
                     <PlayerPitchChip
@@ -602,7 +746,7 @@ export const SquadManager: React.FC = () => {
 
               {/* GK */}
               <div className="flex justify-center mt-1">
-                {currentMatch.teamB.players
+                {activeMatch.teamB.players
                   .filter(p => p.position === 'Kaleci')
                   .map(p => (
                     <PlayerPitchChip
@@ -619,9 +763,9 @@ export const SquadManager: React.FC = () => {
 
               <div className="flex items-center justify-between px-2 pt-1">
                 <span className="text-[11px] font-black uppercase text-blue-300 bg-blue-950/80 px-2 py-0.5 rounded border border-blue-500/30">
-                  {currentMatch.teamB.name} ({currentMatch.teamB.players.length}) • {teamBFormation}
+                  {activeMatch.teamB.name} ({activeMatch.teamB.players.length}) • {teamBFormation}
                 </span>
-                <span className="text-[10px] text-white/60">{isAdmin ? 'Dokunarak Yönet' : 'Salt Okunur'}</span>
+                <span className="text-[10px] text-white/60">{isAdmin && isViewingCurrent ? 'Dokunarak Yönet' : 'Salt Okunur'}</span>
               </div>
             </div>
           </div>
@@ -639,8 +783,8 @@ export const SquadManager: React.FC = () => {
 
           <div className="space-y-2">
             {players.map(player => {
-              const inTeamA = currentMatch.teamA.players.some(p => p.playerId === player.id);
-              const inTeamB = currentMatch.teamB.players.some(p => p.playerId === player.id);
+              const inTeamA = activeMatch.teamA.players.some(p => p.playerId === player.id);
+              const inTeamB = activeMatch.teamB.players.some(p => p.playerId === player.id);
               const isBench = !inTeamA && !inTeamB;
 
               return (
@@ -718,13 +862,13 @@ export const SquadManager: React.FC = () => {
               Format Hedefi: <strong className="text-white">{currentFormat} ({targetCount} Kişi)</strong>
             </span>
             <span>
-              Seçili: <strong className="text-emerald-400">{currentMatch.squad.length} Kişi</strong>
+              Seçili: <strong className="text-emerald-400">{activeMatch.squad.length} Kişi</strong>
             </span>
           </div>
 
           <div className="grid grid-cols-1 gap-2">
             {players.map(p => {
-              const isSelected = currentMatch.squad.includes(p.id);
+              const isSelected = activeMatch.squad.includes(p.id);
               const isSuspended = p.attendanceStats.isSuspended;
 
               return (
@@ -843,8 +987,8 @@ export const SquadManager: React.FC = () => {
                 <div className="grid grid-cols-5 gap-1">
                   {(['Kaleci', 'Defans', 'Orta saha', 'Kanat', 'Forvet'] as Position[]).map(pos => {
                     const currentPos = (pitchPlayerModal.team === 'teamA'
-                      ? currentMatch.teamA.players
-                      : currentMatch.teamB.players
+                      ? activeMatch.teamA.players
+                      : activeMatch.teamB.players
                     ).find(p => p.playerId === pitchPlayerModal.playerId)?.position;
 
                     const isCurrent = currentPos === pos;

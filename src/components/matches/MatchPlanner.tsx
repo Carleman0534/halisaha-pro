@@ -22,6 +22,7 @@ import { EmergencySubstituteFinder } from './EmergencySubstituteFinder';
 import { MatchResultsModal } from './MatchResultsModal';
 import { AddToCalendarModal } from '../common/AddToCalendarModal';
 import { MvpVotingModal } from './MvpVotingModal';
+import { WeeklyArchiveManager } from './WeeklyArchiveManager';
 
 interface MatchPlannerProps {
   onNavigateToSquad: () => void;
@@ -31,6 +32,7 @@ export const MatchPlanner: React.FC<MatchPlannerProps> = ({ onNavigateToSquad })
   const { currentMatch, pastMatches, playersMap, updateAttendance, setMatchScores, createNewMatch, voteMvp } =
     useApp();
 
+  const [activeView, setActiveView] = useState<'upcoming' | 'weeklyArchive'>('upcoming');
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
   const [showResultsModal, setShowResultsModal] = useState(false);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
@@ -44,8 +46,39 @@ export const MatchPlanner: React.FC<MatchPlannerProps> = ({ onNavigateToSquad })
 
   return (
     <div className="space-y-4 pb-20">
-      {/* 3 NUMARALI MODÜL: TARİH, TOPLAM GELEN SAYISI, HABER BEKLENENLER & ACİL ÇAĞRI */}
-      <EmergencySubstituteFinder onNavigateToSquad={onNavigateToSquad} />
+      {/* SEGMENTED VIEW SWITCHER: ÖNÜMÜZDEKİ MAÇ vs HAFTALIK SEKME & GEÇMİŞ ARŞİVİ */}
+      <div className="grid grid-cols-2 p-1 bg-slate-900 border border-slate-800 rounded-2xl shadow-lg">
+        <button
+          onClick={() => setActiveView('upcoming')}
+          className={`py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center space-x-1.5 ${
+            activeView === 'upcoming'
+              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Flame className="w-3.5 h-3.5 text-amber-300" />
+          <span>{currentMatch.matchNumber}. Hafta (Önümüzdeki Maç)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveView('weeklyArchive')}
+          className={`py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center space-x-1.5 ${
+            activeView === 'weeklyArchive'
+              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Calendar className="w-3.5 h-3.5 text-emerald-300" />
+          <span>Haftalık Sekme & Geçmiş</span>
+        </button>
+      </div>
+
+      {activeView === 'weeklyArchive' ? (
+        <WeeklyArchiveManager onNavigateToSquad={onNavigateToSquad} />
+      ) : (
+        <>
+          {/* 3 NUMARALI MODÜL: TARİH, TOPLAM GELEN SAYISI, HABER BEKLENENLER & ACİL ÇAĞRI */}
+          <EmergencySubstituteFinder onNavigateToSquad={onNavigateToSquad} />
 
       {/* Maç Sonu İşlemleri & Takvim Çubuğu */}
       <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between">
@@ -170,13 +203,16 @@ export const MatchPlanner: React.FC<MatchPlannerProps> = ({ onNavigateToSquad })
         {pastMatches.map(m => (
           <div
             key={m.id}
-            className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 transition-all"
+            onClick={() => setActiveView('weeklyArchive')}
+            className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-emerald-500/50 transition-all cursor-pointer group"
           >
             <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-              <span className="font-semibold text-slate-300">
+              <span className="font-semibold text-slate-300 group-hover:text-emerald-400 transition-colors">
                 {m.matchNumber}. Hafta • {new Date(m.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
               </span>
-              <span>{m.pitchNo}</span>
+              <span className="text-[10px] text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                Detayları Gör ➔
+              </span>
             </div>
 
             {/* Scoreboard */}
@@ -206,6 +242,8 @@ export const MatchPlanner: React.FC<MatchPlannerProps> = ({ onNavigateToSquad })
           </div>
         ))}
       </div>
+      </>
+      )}
 
       {/* ATTENDANCE MODAL */}
       {showAttendanceModal && (

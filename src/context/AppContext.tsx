@@ -39,6 +39,8 @@ interface AppContextType {
   togglePayment: (playerId: string) => void;
   updateSquad: (newSquadIds: string[]) => void;
   autoBalanceSquad: () => void;
+  syncSquadFromAttendees: () => { success: boolean; count: number; totalComing?: number; message?: string };
+  updateMatchAttendance: (matchId: string, playerId: string, status: AttendanceStatus) => void;
   setMatchScores: (scoreA: number, scoreB: number, goals?: MatchGoal[], mvpWinnerId?: string) => void;
   createNewMatch: (date: string, time: string, cost: number, venue: string) => void;
   addPlayer: (
@@ -128,7 +130,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [pastMatches, setPastMatches] = useState<Match[]>(() => {
-    return getLocalPastMatches(PAST_MATCHES);
+    const cached = getLocalPastMatches(PAST_MATCHES);
+    if (!cached || cached.length === 0 || cached.some(m => !m.squad || m.squad.length === 0)) {
+      saveLocalPastMatches(PAST_MATCHES);
+      return PAST_MATCHES;
+    }
+    return cached;
   });
 
   const [currentEvaluator, setCurrentEvaluator] = useState<Evaluator>(COUNCIL_MEMBERS[0]);
@@ -278,6 +285,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         [playerId]: status,
       };
 
+      const updatedTimestamps = {
+        ...(prev.attendanceTimestamps || {}),
+        [playerId]: new Date().toISOString(),
+      };
+
       let newSquad = [...prev.squad];
       if (status === 'Geliyor' || status === 'Geldi') {
         if (!newSquad.includes(playerId)) {
@@ -296,6 +308,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...prev,
         squad: newSquad,
         attendance: updatedAttendance,
+        attendanceTimestamps: updatedTimestamps,
       };
 
       saveMatchToDatabase(nextMatch);
@@ -415,6 +428,69 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setCurrentMatch(nextMatch);
     saveMatchToDatabase(nextMatch);
+  };
+
+  // Synchronize squad from players who confirmed attendance ("Geliyor" or "Geldi")
+  const syncSquadFromAttendees = () => {
+    const targetMatch = currentMatch;
+    const comingPlayerIds = Object.entries(targetMatch.attendance)
+      .filter(([_, status]) => status === 'Geliyor' || status === 'Geldi')
+      .map(([id]) => id);
+
+    if (comingPlayerIds.length === 0) {
+      return {
+        success: false,
+        count: 0,
+        totalComing: 0,
+        message: 'Bu hafta için henüz "Geliyor" olarak teyit veren oyuncu bulunmuyor. Önce yoklamadan veya WhatsApp bildiriminden teyit toplayınız.',
+      };
+    }
+
+    const target = targetMatch.targetSquadCount || 14;
+    const newSquad = comingPlayerIds.slice(0, target);
+    const balanced = balanceTeams(newSquad, playersMap);
+    const costPerPlayer = Math.round(targetMatch.totalPitchCost / (newSquad.length || target));
+
+    const updated: Match = {
+      ...targetMatch,
+      squad: newSquad,
+      costPerPlayer,
+      teamA: balanced.teamA,
+      teamB: balanced.teamB,
+    };
+
+    setCurrentMatch(updated);
+    saveMatchToDatabase(updated);
+    return { success: true, count: newSquad.length, totalComing: comingPlayerIds.length };
+  };
+
+  // Update attendance for any match (current or past/archived)
+  const updateMatchAttendance = (matchId: string, playerId: string, status: AttendanceStatus) => {
+    if (matchId === currentMatch.id) {
+      updateAttendance(playerId, status);
+      return;
+    }
+
+    setPastMatches(prev => {
+      const next = prev.map(m => {
+        if (m.id !== matchId) return m;
+        const updatedAttendance = {
+          ...m.attendance,
+          [playerId]: status,
+        };
+        const updatedTimestamps = {
+          ...(m.attendanceTimestamps || {}),
+          [playerId]: new Date().toISOString(),
+        };
+        return {
+          ...m,
+          attendance: updatedAttendance,
+          attendanceTimestamps: updatedTimestamps,
+        };
+      });
+      saveLocalPastMatches(next);
+      return next;
+    });
   };
 
   // Set match scores and complete
@@ -845,6 +921,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         togglePayment,
         updateSquad,
         autoBalanceSquad,
+        syncSquadFromAttendees,
+        updateMatchAttendance,
         setMatchScores,
         createNewMatch,
         updateMatchDetails,

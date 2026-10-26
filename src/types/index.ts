@@ -135,6 +135,7 @@ export interface Match {
   teamA: Team;
   teamB: Team;
   attendance: Record<string, AttendanceStatus>;
+  attendanceTimestamps?: Record<string, string>; // playerId -> ISO confirmation timestamp
   payments: Record<string, MatchPayment>;
   goals?: MatchGoal[];
   mvpVotes?: Record<string, number>; // playerId -> vote count
