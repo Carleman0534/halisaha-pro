@@ -342,6 +342,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Create next match
   const createNewMatch = (date: string, time: string, cost: number, venue: string) => {
+    // Archive current match into pastMatches
+    setPastMatches(prev => {
+      const next = [currentMatch, ...prev.filter(m => m.id !== currentMatch.id)];
+      saveLocalPastMatches(next);
+      return next;
+    });
+
     const nextNumber = currentMatch.matchNumber + 1;
     const defaultSquad = players.slice(0, 14).map(p => p.id);
     const balanced = balanceTeams(defaultSquad, playersMap);

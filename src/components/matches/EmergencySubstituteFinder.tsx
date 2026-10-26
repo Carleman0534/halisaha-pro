@@ -90,7 +90,13 @@ export const EmergencySubstituteFinder: React.FC<EmergencySubstituteFinderProps>
   // Date & Countdown calculation
   const { dateFormatted, countdownText, isUrgent } = useMemo(() => {
     try {
-      const matchDate = new Date(`${currentMatch.date}T21:00:00`);
+      const cleanDate = (currentMatch.date || '').split('T')[0] || new Date().toISOString().split('T')[0];
+      const startTime = (currentMatch.time || '21:00').split('-')[0].trim();
+      const [h, m] = startTime.split(':');
+      const hourStr = (h || '21').padStart(2, '0');
+      const minStr = (m || '00').padStart(2, '0');
+
+      const matchDate = new Date(`${cleanDate}T${hourStr}:${minStr}:00`);
       const now = new Date();
       const diffMs = matchDate.getTime() - now.getTime();
       const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
@@ -123,7 +129,7 @@ export const EmergencySubstituteFinder: React.FC<EmergencySubstituteFinderProps>
     } catch {
       return { dateFormatted: currentMatch.date, countdownText: 'Yaklaşıyor', isUrgent: false };
     }
-  }, [currentMatch.date]);
+  }, [currentMatch.date, currentMatch.time]);
 
   // Position needs analysis
   const positionNeeds = useMemo(() => {
