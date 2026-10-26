@@ -10,12 +10,14 @@ import {
   Edit2,
   ChevronRight,
   Sparkles,
+  MessageCircle,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Player, Position } from '../../types';
 import { PlayerDetailModal } from './PlayerDetailModal';
 import { EvaluatorModal } from './EvaluatorModal';
 import { FifaCardModal } from './FifaCardModal';
+import { WhatsAppInviteModal } from '../common/WhatsAppInviteModal';
 
 export const PlayerPool: React.FC = () => {
   const { players, addPlayer } = useApp();
@@ -26,6 +28,7 @@ export const PlayerPool: React.FC = () => {
   const [detailPlayer, setDetailPlayer] = useState<Player | null>(null);
   const [evaluatingPlayer, setEvaluatingPlayer] = useState<Player | null>(null);
   const [fifaCardPlayer, setFifaCardPlayer] = useState<Player | null>(null);
+  const [invitePlayer, setInvitePlayer] = useState<Player | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
 
   // New Player Form State
@@ -79,6 +82,15 @@ export const PlayerPool: React.FC = () => {
             className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
           />
         </div>
+
+        <button
+          onClick={() => setInvitePlayer(players[0] || null)}
+          className="flex items-center space-x-1 py-2 px-3 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all active:scale-95"
+          title="WhatsApp Maç Daveti Gönder"
+        >
+          <MessageCircle className="w-4 h-4 text-emerald-400" />
+          <span>Davet Et</span>
+        </button>
 
         <button
           onClick={() => setShowAddModal(true)}
@@ -166,6 +178,13 @@ export const PlayerPool: React.FC = () => {
               {/* Quick Actions */}
               <div className="flex items-center space-x-1 pl-2">
                 <button
+                  onClick={() => setInvitePlayer(player)}
+                  title="WhatsApp'tan Maça Davet Et"
+                  className="p-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition-all active:scale-90"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                </button>
+                <button
                   onClick={() => setFifaCardPlayer(player)}
                   title="FIFA Kartını Gör & İndir"
                   className="p-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition-all active:scale-90"
@@ -190,6 +209,14 @@ export const PlayerPool: React.FC = () => {
             </div>
           ))}
       </div>
+
+      {/* WHATSAPP INVITE MODAL */}
+      {invitePlayer && (
+        <WhatsAppInviteModal
+          player={invitePlayer}
+          onClose={() => setInvitePlayer(null)}
+        />
+      )}
 
       {/* FIFA CARD MODAL */}
       {fifaCardPlayer && (

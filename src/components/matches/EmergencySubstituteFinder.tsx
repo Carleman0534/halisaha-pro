@@ -248,17 +248,37 @@ ${
   };
 
   const openPersonalWhatsAppPing = (player: Player) => {
-    const text = encodeURIComponent(
-      `Selam ${player.name}, bu haftaki halı saha maçımız (${dateFormatted} | ${currentMatch.time}) için durumunu netleştirebilir misin? Geliyor musun? Saha: ${currentMatch.venueName}`
-    );
-    window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+    try {
+      const d = new Date(currentMatch.date);
+      const day = d.toLocaleDateString('tr-TR', { weekday: 'long' });
+      const timeOnly = currentMatch.time.split('-')[0].trim();
+      const text = encodeURIComponent(
+        `Selam ${player.name}, ${day} günü saat ${timeOnly}'de maçımız var, gelmek ister misin? ⚽🔥\nSaha: ${currentMatch.venueName}`
+      );
+      window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+    } catch {
+      const text = encodeURIComponent(
+        `Selam ${player.name}, ${dateFormatted} saat ${currentMatch.time} maçımız var, gelmek ister misin? ⚽\nSaha: ${currentMatch.venueName}`
+      );
+      window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+    }
   };
 
   const openSubInviteWhatsApp = (player: Player) => {
-    const text = encodeURIComponent(
-      `Selam ${player.name}, ${dateFormatted} saat ${currentMatch.time} halı saha maçımızda ${player.primaryPosition} mevkisinde eksiğimiz var. Aramıza katılabilir misin? Saha: ${currentMatch.venueName}`
-    );
-    window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+    try {
+      const d = new Date(currentMatch.date);
+      const day = d.toLocaleDateString('tr-TR', { weekday: 'long' });
+      const timeOnly = currentMatch.time.split('-')[0].trim();
+      const text = encodeURIComponent(
+        `Selam ${player.name}, ${day} günü saat ${timeOnly}'de maçımızda acil ${player.primaryPosition} eksiğimiz var, gelmek ister misin? 🚨⚽\nSaha: ${currentMatch.venueName}`
+      );
+      window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+    } catch {
+      const text = encodeURIComponent(
+        `Selam ${player.name}, ${dateFormatted} saat ${currentMatch.time} halı saha maçımızda ${player.primaryPosition} eksiğimiz var, gelmek ister misin? ⚽`
+      );
+      window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+    }
   };
 
   return (
