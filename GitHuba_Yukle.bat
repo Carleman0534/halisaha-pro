@@ -17,7 +17,7 @@ cd /d "C:\Users\user\Desktop\halisaha-pro-main"
 
 git branch -M main
 git add .
-git commit -m "feat: direct logout button in header and 1-tap quick profile switcher" >nul 2>&1
+git commit -m "feat: full-width shade expansion on click of left-pinned logo" >nul 2>&1
 git push -u origin main --force
 
 echo.
