@@ -224,10 +224,10 @@ export function balanceTeams(
   playersMap: Record<string, Player>
 ): { teamA: Team; teamB: Team } {
   const squad = squadPlayerIds.map(id => playersMap[id]).filter(Boolean);
+  const targetPerTeam = Math.ceil(squad.length / 2);
 
-  if (squad.length !== 14) {
-    // If not exactly 14, simple split
-    const mid = Math.ceil(squad.length / 2);
+  if (squad.length < 4) {
+    const mid = targetPerTeam;
     const aPlayers = squad.slice(0, mid);
     const bPlayers = squad.slice(mid);
 
@@ -239,7 +239,7 @@ export function balanceTeams(
         players: aPlayers.map(p => ({ playerId: p.id, position: p.primaryPosition, score: p.finalScore })),
       },
       teamB: {
-        name: 'Beyaz Takım',
+        name: 'Mavi Takım',
         color: '#3b82f6',
         totalPower: Number(bPlayers.reduce((sum, p) => sum + p.finalScore, 0).toFixed(1)),
         players: bPlayers.map(p => ({ playerId: p.id, position: p.primaryPosition, score: p.finalScore })),
@@ -280,7 +280,7 @@ export function balanceTeams(
       const sumA = teamAPlayers.reduce((acc, p) => acc + p.score, 0);
       const sumB = teamBPlayers.reduce((acc, p) => acc + p.score, 0);
 
-      if (teamAPlayers.length < 7 && (sumA <= sumB || teamBPlayers.length >= 7)) {
+      if (teamAPlayers.length < targetPerTeam && (sumA <= sumB || teamBPlayers.length >= targetPerTeam)) {
         teamAPlayers.push({ playerId: player.id, position: player.primaryPosition, score: player.finalScore });
       } else {
         teamBPlayers.push({ playerId: player.id, position: player.primaryPosition, score: player.finalScore });
@@ -332,7 +332,7 @@ export function balanceTeams(
       players: teamAPlayers,
     },
     teamB: {
-      name: 'Beyaz Takım',
+      name: 'Mavi Takım',
       color: '#3b82f6',
       totalPower: totalPowerB,
       players: teamBPlayers,

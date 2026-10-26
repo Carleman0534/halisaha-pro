@@ -68,6 +68,7 @@ export const SquadManager: React.FC = () => {
   const [showVersionHistoryModal, setShowVersionHistoryModal] = useState(false);
   const [showVisualCardModal, setShowVisualCardModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [formatNotice, setFormatNotice] = useState<string | null>(null);
 
   // Selected week match ID for week switching
   const [selectedMatchId, setSelectedMatchId] = useState<string>(currentMatch.id);
@@ -100,7 +101,10 @@ export const SquadManager: React.FC = () => {
   }, [currentMatch.attendance]);
 
   const handleSyncAttendees = () => {
-    if (!isAdmin) return;
+    if (!isAdmin && !isCouncil) {
+      setShowAuthModal(true);
+      return;
+    }
     const res = syncSquadFromAttendees(activeMatch.id);
     if (res.success) {
       try {
@@ -118,6 +122,29 @@ export const SquadManager: React.FC = () => {
     } else {
       alert(res.message || 'Gelen oyuncu bulunamadı.');
     }
+  };
+
+  // Handle format selection (5v5, 6v6, 7v7, 8v8) with rich feedback and auth fallback
+  const handleSelectFormat = (fmt: '5v5' | '6v6' | '7v7' | '8v8') => {
+    if (!isAdmin && !isCouncil) {
+      setFormatNotice('Maç formatını (5v5, 6v6, 7v7, 8v8) değiştirmek için Yönetici veya Konsey girişi yapınız.');
+      setShowAuthModal(true);
+      return;
+    }
+
+    if (isFinalized) {
+      setFormatNotice('Kadro kesinleştiği için kilitlidir. Formatı değiştirmek için önce yukarıdaki "Kilidi Aç" butonuna basınız.');
+      setTimeout(() => setFormatNotice(null), 4000);
+      return;
+    }
+
+    setMatchFormat(fmt, activeMatch.id);
+    const countMap = { '5v5': 10, '6v6': 12, '7v7': 14, '8v8': 16 };
+    setFormatNotice(`🎯 Maç formatı başarıyla ${fmt} (${countMap[fmt]} Kişi) olarak ayarlandı!`);
+    try {
+      confetti({ particleCount: 30, spread: 60, origin: { y: 0.5 } });
+    } catch {}
+    setTimeout(() => setFormatNotice(null), 3500);
   };
 
   // Active match format (default 7v7, 14 players)
@@ -268,7 +295,10 @@ export const SquadManager: React.FC = () => {
 
   // Toggle player selection in squad
   const togglePlayerInSquad = (playerId: string) => {
-    if (!isAdmin) return;
+    if (!isAdmin && !isCouncil) {
+      setShowAuthModal(true);
+      return;
+    }
     if (isFinalized) {
       alert('Kadro kesinleştiği için değişiklik yapılamaz. Önce kilidi kaldırın.');
       return;
@@ -545,7 +575,7 @@ export const SquadManager: React.FC = () => {
 
           <button
             onClick={handleSyncAttendees}
-            disabled={!isAdmin || isFinalized}
+            disabled={(!isAdmin && !isCouncil) || isFinalized}
             className="px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black font-black text-xs shadow-md shadow-emerald-500/20 flex items-center space-x-1.5 active:scale-95 transition-all shrink-0 ml-2"
           >
             <Wand2 className="w-3.5 h-3.5" />
@@ -555,19 +585,23 @@ export const SquadManager: React.FC = () => {
       )}
 
       {/* Guest Mode Notice */}
-      {!isAdmin && (
+      {!isAdmin && !isCouncil && (
         <div className="flex items-center space-x-2.5 p-3 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs">
           <Shield className="w-4 h-4 text-blue-400 shrink-0" />
-          <div>
+          <div className="flex-1">
             <strong className="text-white block font-semibold">
-              {isCouncil ? 'Konsey Üyesi Modu' : isPlayer ? 'Kayıtlı Oyuncu Modu' : 'Misafir İzleme Modu'}
+              {isPlayer ? 'Kayıtlı Oyuncu Modu' : 'Misafir İzleme Modu'}
             </strong>
             <span>
-              {isCouncil
-                ? 'Konsey üyesi olarak tüm kadroları ve oyuncu değerlendirmelerini görebilirsiniz.'
-                : 'Kadro ve taktik saha görüntülenmektedir. Gizli puanlar konsey üyelerine aittir.'}
+              Kadro ve taktik saha görüntülenmektedir. Kadroda değişiklik yapmak için yönetici girişi yapabilirsiniz.
             </span>
           </div>
+          <button
+            onClick={() => setShowAuthModal(true)}
+            className="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-black text-[11px] shadow-sm shrink-0 active:scale-95 transition-all"
+          >
+            Giriş Yap
+          </button>
         </div>
       )}
 
@@ -583,6 +617,18 @@ export const SquadManager: React.FC = () => {
           </span>
         </div>
 
+        {formatNotice && (
+          <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center justify-between animate-in fade-in">
+            <span>{formatNotice}</span>
+            <button
+              onClick={() => setFormatNotice(null)}
+              className="text-emerald-400 hover:text-white text-xs px-1"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         <div className="grid grid-cols-4 gap-1.5">
           {(['5v5', '6v6', '7v7', '8v8'] as const).map(fmt => {
             const isFmtActive = currentFormat === fmt;
@@ -591,14 +637,12 @@ export const SquadManager: React.FC = () => {
             return (
               <button
                 key={fmt}
-                disabled={!isAdmin || isFinalized}
-                onClick={() => isAdmin && !isFinalized && setMatchFormat(fmt, activeMatch.id)}
-                className={`py-2 px-1 rounded-xl text-center border transition-all ${
-                  !isAdmin || isFinalized ? 'cursor-default opacity-85 ' : ''
-                }${
+                type="button"
+                onClick={() => handleSelectFormat(fmt)}
+                className={`py-2 px-1 rounded-xl text-center border transition-all cursor-pointer active:scale-95 ${
                   isFmtActive
                     ? 'bg-emerald-600 border-emerald-400 text-white shadow-md shadow-emerald-600/30 font-black'
-                    : 'bg-slate-800/80 border-slate-700/60 text-slate-400 hover:text-white font-bold'
+                    : 'bg-slate-800/80 border-slate-700/60 text-slate-400 hover:text-white font-bold hover:border-slate-600'
                 }`}
               >
                 <div className="text-xs">{fmt}</div>
@@ -682,8 +726,8 @@ export const SquadManager: React.FC = () => {
         </div>
 
         {/* Buttons */}
-        <div className={`grid grid-cols-1 ${isAdmin ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-2 pt-1`}>
-          {isAdmin && (
+        <div className={`grid grid-cols-1 ${isAdmin || isCouncil ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-2 pt-1`}>
+          {(isAdmin || isCouncil) && (
             <button
               onClick={handleAutoBalance}
               disabled={isFinalized}
@@ -711,7 +755,7 @@ export const SquadManager: React.FC = () => {
       </div>
 
       {/* 3 SUB-TABS: PITCH, MANUAL ASSIGNMENT, POOL SELECT */}
-      {isAdmin && (
+      {(isAdmin || isCouncil) && (
         <div className="grid grid-cols-3 p-1 bg-slate-900 border border-slate-800 rounded-2xl shadow-lg">
           <button
             onClick={() => setActiveTab('pitch')}
@@ -752,7 +796,7 @@ export const SquadManager: React.FC = () => {
       {activeTab === 'pitch' && (
         <div className="space-y-4">
           {/* Tactical Formation Switcher (Team A & B) */}
-          {isAdmin && (
+          {(isAdmin || isCouncil) && (
             <div className="grid grid-cols-2 gap-2 bg-slate-900 p-2.5 rounded-2xl border border-slate-800 text-xs">
               <div>
                 <label className="text-[10px] uppercase font-bold text-rose-400 block mb-1">

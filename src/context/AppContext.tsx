@@ -1367,7 +1367,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!targetMatch) return;
 
     const targetMap = { '5v5': 10, '6v6': 12, '7v7': 14, '8v8': 16 };
+    const formationMap: Record<string, string> = { '5v5': '2-1-1', '6v6': '2-2-1', '7v7': '3-2-1', '8v8': '3-3-1' };
     const target = targetMap[format] || 14;
+    const nextFormation = formationMap[format] || '3-2-1';
     const costPerPlayer = Math.round(targetMatch.totalPitchCost / target);
 
     const newSquad =
@@ -1383,8 +1385,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       targetSquadCount: target,
       costPerPlayer,
       squad: newSquad,
-      teamA: balanced.teamA,
-      teamB: balanced.teamB,
+      teamA: {
+        ...balanced.teamA,
+        formation: nextFormation,
+      },
+      teamB: {
+        ...balanced.teamB,
+        formation: nextFormation,
+      },
     };
 
     if (isCurrent) {
