@@ -899,7 +899,7 @@ ${generalDecline}
               >
                 <div className="flex items-center space-x-2.5">
                   <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center font-mono font-black text-xs text-emerald-400 border border-slate-700">
-                    {Math.round(sub.finalScore * 10)}
+                    {isCouncil ? Math.round(sub.finalScore * 10) : '⚽'}
                   </div>
                   <div>
                     <div className="flex items-center space-x-1.5">
@@ -918,23 +918,25 @@ ${generalDecline}
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-1.5">
-                  <button
-                    onClick={() => openSubInviteWhatsApp(sub)}
-                    title="WhatsApp'tan Özel Davet Gönder"
-                    className="p-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs transition-all active:scale-95"
-                  >
-                    <MessageCircle className="w-3.5 h-3.5" />
-                  </button>
+                {(isAdmin || isCouncil) && (
+                  <div className="flex items-center space-x-1.5">
+                    <button
+                      onClick={() => openSubInviteWhatsApp(sub)}
+                      title="WhatsApp'tan Özel Davet Gönder"
+                      className="p-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs transition-all active:scale-95"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                    </button>
 
-                  <button
-                    onClick={() => updateAttendance(sub.id, 'Geliyor')}
-                    className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] shadow-sm transition-all active:scale-95"
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>Kadroya Al</span>
-                  </button>
-                </div>
+                    <button
+                      onClick={() => updateAttendance(sub.id, 'Geliyor')}
+                      className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] shadow-sm transition-all active:scale-95"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Kadroya Al</span>
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -1161,10 +1163,14 @@ ${generalDecline}
                       </div>
                       <div className="flex items-center space-x-2 text-[10px] text-slate-400">
                         <span className="text-slate-300 font-semibold">{p.primaryPosition}</span>
-                        <span>•</span>
-                        <span className="font-mono text-emerald-400 font-bold">
-                          {Math.round(p.finalScore * 10)} OVR
-                        </span>
+                        {isCouncil && (
+                          <>
+                            <span>•</span>
+                            <span className="font-mono text-emerald-400 font-bold">
+                              {Math.round(p.finalScore * 10)} OVR
+                            </span>
+                          </>
+                        )}
                         {p.attendanceStats.penaltyPoints > 0 && (
                           <>
                             <span>•</span>
@@ -1178,7 +1184,7 @@ ${generalDecline}
                   </div>
 
                   {/* Action Area */}
-                  {isAdmin ? (
+                  {(isAdmin || isCouncil) ? (
                     <div className="flex items-center flex-wrap gap-1">
                       {/* Coming Player In-match Payment & IBAN Actions */}
                       {isComing && (

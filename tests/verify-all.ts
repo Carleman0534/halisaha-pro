@@ -2,6 +2,8 @@ import {
   canRatePlayers,
   canViewRatings,
   canViewRoster,
+  canManageAttendance,
+  getRolePermissions,
   isPlayerExemptForMatch,
   calculateMatchFinancials,
 } from '../src/utils/permissions.ts';
@@ -59,6 +61,14 @@ assert(canViewRatings(adminUser) === true, 'Admin puanları görebilir');
 assert(canViewRatings(councilUser) === true, 'Konsey üyesi puanları görebilir');
 assert(canViewRatings(playerUser) === false, 'Normal oyuncu puanları GÖREMEZ');
 assert(canViewRatings(guestUser) === false, 'Misafir puanları GÖREMEZ');
+
+// Yoklama Yetkilendirmesi (Gelenler, Gelmeyenler, Bekleyenler, Sattı)
+assert(canManageAttendance(adminUser) === true, 'Admin tüm oyuncuların katılım durumunu (Gelen/Gelmeyen/Bekleyen/Sattı) girebilir');
+assert(canManageAttendance(councilUser) === true, 'Konsey üyesi tüm oyuncuların katılım durumunu (Gelen/Gelmeyen/Bekleyen/Sattı) sisteme girebilir');
+assert(canManageAttendance(playerUser) === false, 'Normal oyuncu diğer oyuncuların yoklamasını GİREMEZ');
+assert(canManageAttendance(guestUser) === false, 'Misafir diğer oyuncuların yoklamasını GİREMEZ');
+assert(getRolePermissions('council_member').canManageAttendance === true, 'Konsey rol yetkisi: canManageAttendance = true');
+assert(getRolePermissions('player').canManageAttendance === false, 'Oyuncu rol yetkisi: canManageAttendance = false');
 
 // ----------------------------------------------------
 // TEST 3: MİSAFİR KADRO ERİŞİM KURALLARI

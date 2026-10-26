@@ -267,6 +267,7 @@ export interface RolePermissions {
   canRatePlayers: boolean;
   canViewRatings: boolean;
   canManageSquad: boolean;
+  canManageAttendance: boolean;
   canLockSquad: boolean;
   canManageFinance: boolean;
   canSetExemption: boolean;

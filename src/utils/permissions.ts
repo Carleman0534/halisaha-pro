@@ -10,6 +10,7 @@ export function getRolePermissions(role: UserRole): RolePermissions {
         canRatePlayers: true,
         canViewRatings: true,
         canManageSquad: true,
+        canManageAttendance: true,
         canLockSquad: true,
         canManageFinance: true,
         canSetExemption: true,
@@ -22,6 +23,7 @@ export function getRolePermissions(role: UserRole): RolePermissions {
         canRatePlayers: true,
         canViewRatings: true,
         canManageSquad: true,
+        canManageAttendance: true,
         canLockSquad: false,
         canManageFinance: false,
         canSetExemption: false,
@@ -34,6 +36,7 @@ export function getRolePermissions(role: UserRole): RolePermissions {
         canRatePlayers: false,
         canViewRatings: false,
         canManageSquad: false,
+        canManageAttendance: false,
         canLockSquad: false,
         canManageFinance: false,
         canSetExemption: false,
@@ -47,6 +50,7 @@ export function getRolePermissions(role: UserRole): RolePermissions {
         canRatePlayers: false,
         canViewRatings: false,
         canManageSquad: false,
+        canManageAttendance: false,
         canLockSquad: false,
         canManageFinance: false,
         canSetExemption: false,
@@ -55,6 +59,15 @@ export function getRolePermissions(role: UserRole): RolePermissions {
         canRestoreSquadVersions: false,
       };
   }
+}
+
+/**
+ * Evaluates whether a user can enter/update attendance for any player
+ * (Gelenler, Gelmeyenler, Bekleyenler, Sattı)
+ * Council members and admins have full management permissions.
+ */
+export function canManageAttendance(user: AppUser): boolean {
+  return user.role === 'admin' || user.role === 'council_member';
 }
 
 /**
