@@ -17,7 +17,7 @@ cd /d "C:\Users\user\Desktop\halisaha-pro-main"
 
 git branch -M main
 git add .
-git commit -m "feat: full-width shade expansion on click of left-pinned logo" >nul 2>&1
+git commit -m "feat: vertical left sidebar layout on desktop with full navigation, fast profiles and direct logout" >nul 2>&1
 git push -u origin main --force
 
 echo.
