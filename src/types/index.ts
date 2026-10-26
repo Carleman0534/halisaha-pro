@@ -8,6 +8,16 @@ export interface Evaluator {
   role: 'admin' | 'council_member';
 }
 
+export type UserRole = 'admin' | 'guest';
+
+export interface AppUser {
+  id: string;
+  name: string;
+  role: UserRole;
+  playerId?: string;
+  evaluatorId?: string;
+}
+
 export interface CriterionInfo {
   key: string;
   label: string;
