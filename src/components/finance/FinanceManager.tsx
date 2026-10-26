@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Wallet,
   CheckCircle2,
@@ -12,6 +12,7 @@ import {
   ExternalLink,
   MessageCircle,
   Building2,
+  Calendar,
   X,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
@@ -20,10 +21,20 @@ import { Player } from '../../types';
 import { QrPaymentModal } from './QrPaymentModal';
 
 export const FinanceManager: React.FC = () => {
-  const { currentMatch, players, playersMap, togglePayment } = useApp();
+  const { currentMatch, pastMatches, players, playersMap, togglePayment } = useApp();
 
   const [copiedIbanToast, setCopiedIbanToast] = useState(false);
   const [copiedDebtToast, setCopiedDebtToast] = useState(false);
+
+  // Match selector: view current active match or any past archived match
+  const [selectedMatchId, setSelectedMatchId] = useState<string>(currentMatch.id);
+
+  const activeMatch = useMemo(() => {
+    if (selectedMatchId === currentMatch.id) return currentMatch;
+    return pastMatches.find(m => m.id === selectedMatchId) || currentMatch;
+  }, [selectedMatchId, currentMatch, pastMatches]);
+
+  const isCurrentActive = activeMatch.id === currentMatch.id;
 
   const [selectedPlayerForQr, setSelectedPlayerForQr] = useState<Player | null>(null);
   const [showGeneralQr, setShowGeneralQr] = useState(false);
@@ -40,11 +51,11 @@ export const FinanceManager: React.FC = () => {
   const [editIbanValue, setEditIbanValue] = useState(iban);
   const [editReceiverValue, setEditReceiverValue] = useState(receiverName);
 
-  // Financial calculations
-  const totalCost = currentMatch.totalPitchCost;
-  const costPerPlayer = currentMatch.costPerPlayer;
+  // Financial calculations for the selected match
+  const totalCost = activeMatch.totalPitchCost;
+  const costPerPlayer = activeMatch.costPerPlayer;
 
-  const paidCount = currentMatch.squad.filter(id => currentMatch.payments[id]?.isPaid).length;
+  const paidCount = activeMatch.squad.filter(id => activeMatch.payments[id]?.isPaid).length;
   const totalCollected = paidCount * costPerPlayer;
   const remainingDebt = Math.max(0, totalCost - totalCollected);
   const progressPercent = Math.min(100, Math.round((totalCollected / (totalCost || 1)) * 100));
