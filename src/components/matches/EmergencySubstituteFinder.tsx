@@ -32,6 +32,8 @@ import { Player, AttendanceStatus, Position } from '../../types';
 import { sendOneDayBeforeReminder } from '../../services/notifications';
 import { AddToCalendarModal } from '../common/AddToCalendarModal';
 import { EditMatchModal } from './EditMatchModal';
+import { PlayerAttendanceConfirmCard } from './PlayerAttendanceConfirmCard';
+import { AuthRoleModal } from '../auth/AuthRoleModal';
 
 interface EmergencySubstituteFinderProps {
   onNavigateToSquad?: () => void;
@@ -40,13 +42,23 @@ interface EmergencySubstituteFinderProps {
 export const EmergencySubstituteFinder: React.FC<EmergencySubstituteFinderProps> = ({
   onNavigateToSquad,
 }) => {
-  const { currentMatch, players, playersMap, updateAttendance, togglePayment } = useApp();
+  const {
+    currentMatch,
+    players,
+    playersMap,
+    updateAttendance,
+    togglePayment,
+    currentUser,
+    isAdmin,
+    isGuest,
+  } = useApp();
 
   const [activeFilter, setActiveFilter] = useState<'all' | 'geliyor' | 'bekleniyor' | 'gelemiyor' | 'satti'>('bekleniyor');
   const [searchQuery, setSearchQuery] = useState('');
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [showEditMatchModal, setShowEditMatchModal] = useState<'edit' | 'create' | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [copiedBroadcast, setCopiedBroadcast] = useState(false);
   const [selectedPositionFilter, setSelectedPositionFilter] = useState<string>('all');
 
@@ -271,57 +283,55 @@ ${
     window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
   };
 
-  const openPersonalWhatsAppPing = (player: Player) => {
+  const getConfirmUrl = (playerId: string) => {
     try {
-      const d = new Date(currentMatch.date);
-      const day = d.toLocaleDateString('tr-TR', { weekday: 'long' });
-      const timeOnly = currentMatch.time.split('-')[0].trim();
-      const text = encodeURIComponent(
-        `Selam ${player.name}, ${day} günü saat ${timeOnly}'de maçımız var, gelmek ister misin? ⚽🔥\nSaha: ${currentMatch.venueName}`
-      );
-      window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+      const origin = window.location.origin + window.location.pathname;
+      return `${origin}?player=${playerId}`;
     } catch {
-      const text = encodeURIComponent(
-        `Selam ${player.name}, ${dateFormatted} saat ${currentMatch.time} maçımız var, gelmek ister misin? ⚽\nSaha: ${currentMatch.venueName}`
-      );
-      window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+      return '';
     }
   };
 
+  const openPersonalWhatsAppPing = (player: Player) => {
+    const confirmUrl = getConfirmUrl(player.id);
+    const d = new Date(currentMatch.date);
+    const day = d.toLocaleDateString('tr-TR', { weekday: 'long' });
+    const timeOnly = currentMatch.time.split('-')[0].trim();
+    const text = encodeURIComponent(
+      `Selam ${player.name}, ${day} günü saat ${timeOnly}'de maçımız var, gelmek ister misin? ⚽🔥\n` +
+      `📍 Saha: ${currentMatch.venueName}\n\n` +
+      `📲 Katılımını [Geliyorum / Gelmiyorum] tek tıkla onaylamak için:\n${confirmUrl}`
+    );
+    const phoneParam = player.phone ? `phone=${player.phone.replace(/\D/g, '')}&` : '';
+    window.open(`https://api.whatsapp.com/send?${phoneParam}text=${text}`, '_blank');
+  };
+
   const openSubInviteWhatsApp = (player: Player) => {
-    try {
-      const d = new Date(currentMatch.date);
-      const day = d.toLocaleDateString('tr-TR', { weekday: 'long' });
-      const timeOnly = currentMatch.time.split('-')[0].trim();
-      const text = encodeURIComponent(
-        `Selam ${player.name}, ${day} günü saat ${timeOnly}'de maçımızda acil ${player.primaryPosition} eksiğimiz var, gelmek ister misin? 🚨⚽\nSaha: ${currentMatch.venueName}`
-      );
-      window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
-    } catch {
-      const text = encodeURIComponent(
-        `Selam ${player.name}, ${dateFormatted} saat ${currentMatch.time} halı saha maçımızda ${player.primaryPosition} eksiğimiz var, gelmek ister misin? ⚽`
-      );
-      window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
-    }
+    const confirmUrl = getConfirmUrl(player.id);
+    const d = new Date(currentMatch.date);
+    const day = d.toLocaleDateString('tr-TR', { weekday: 'long' });
+    const timeOnly = currentMatch.time.split('-')[0].trim();
+    const text = encodeURIComponent(
+      `Selam ${player.name}, ${day} günü saat ${timeOnly}'de maçımızda acil ${player.primaryPosition} eksiğimiz var, gelmek ister misin? 🚨⚽\n` +
+      `📍 Saha: ${currentMatch.venueName}\n\n` +
+      `📲 Katılımını onaylamak için tıkla:\n${confirmUrl}`
+    );
+    const phoneParam = player.phone ? `phone=${player.phone.replace(/\D/g, '')}&` : '';
+    window.open(`https://api.whatsapp.com/send?${phoneParam}text=${text}`, '_blank');
   };
 
   const [oneDayNotifSent, setOneDayNotifSent] = useState(false);
 
   const openOneDayPlayerWhatsApp = (player: Player) => {
-    try {
-      const d = new Date(currentMatch.date);
-      const day = d.toLocaleDateString('tr-TR', { weekday: 'long' });
-      const timeOnly = currentMatch.time.split('-')[0].trim();
-      const text = encodeURIComponent(
-        `Selam ${player.name}, yarın saat ${timeOnly}'de halı saha maçımız var, unutmadın değil mi? ⚽🔥\nSaha: ${currentMatch.venueName}\nÇantaları bu akşamdan hazırla, görüşürüz!`
-      );
-      window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
-    } catch {
-      const text = encodeURIComponent(
-        `Selam ${player.name}, yarın saat ${currentMatch.time} halı saha maçımız var, unutmadın değil mi? ⚽🔥\nSaha: ${currentMatch.venueName}`
-      );
-      window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
-    }
+    const confirmUrl = getConfirmUrl(player.id);
+    const timeOnly = currentMatch.time.split('-')[0].trim();
+    const text = encodeURIComponent(
+      `Selam ${player.name}, yarın saat ${timeOnly}'de halı saha maçımız var, unutmadın değil mi? ⚽🔥\n` +
+      `📍 Saha: ${currentMatch.venueName}\n\n` +
+      `Çantaları bu akşamdan hazırla! Maç detayları & kadro:\n${confirmUrl}`
+    );
+    const phoneParam = player.phone ? `phone=${player.phone.replace(/\D/g, '')}&` : '';
+    window.open(`https://api.whatsapp.com/send?${phoneParam}text=${text}`, '_blank');
   };
 
   const handleSendOneDayBroadcast = () => {
@@ -415,6 +425,9 @@ ${gelenlerLines || '(Henüz kadro kesinleşmedi)'}
 
   return (
     <div className="space-y-4">
+      {/* 0. OYUNCU / MİSAFİR MAÇ KATILIM ONAY KARTI */}
+      <PlayerAttendanceConfirmCard onOpenAuthModal={() => setShowAuthModal(true)} />
+
       {/* 1. TARİH, SAAT & GERİ SAYIM KARTI */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 border border-emerald-500/30 p-4 shadow-xl">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
@@ -424,22 +437,26 @@ ${gelenlerLines || '(Henüz kadro kesinleşmedi)'}
           </div>
 
           <div className="flex items-center space-x-1.5">
-            <button
-              onClick={() => setShowEditMatchModal('edit')}
-              className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-[11px] font-bold transition-all active:scale-95 shadow-sm"
-              title="Bu Maçın Tarih, Saat, Saha ve Ücretini Düzenle"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-              <span>Maçı Düzenle</span>
-            </button>
-            <button
-              onClick={() => setShowEditMatchModal('create')}
-              className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 text-[11px] font-bold transition-all active:scale-95 shadow-sm"
-              title="Yeni Hafta Maçı Planla"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>+ Yeni Maç</span>
-            </button>
+            {isAdmin && (
+              <>
+                <button
+                  onClick={() => setShowEditMatchModal('edit')}
+                  className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-[11px] font-bold transition-all active:scale-95 shadow-sm"
+                  title="Bu Maçın Tarih, Saat, Saha ve Ücretini Düzenle"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Maçı Düzenle</span>
+                </button>
+                <button
+                  onClick={() => setShowEditMatchModal('create')}
+                  className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 text-[11px] font-bold transition-all active:scale-95 shadow-sm"
+                  title="Yeni Hafta Maçı Planla"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Yeni Maç</span>
+                </button>
+              </>
+            )}
             <div
               className={`flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${
                 isUrgent
@@ -935,108 +952,150 @@ ${gelenlerLines || '(Henüz kadro kesinleşmedi)'}
                     </div>
                   </div>
 
-                  {/* Quick Action Toggles */}
-                  <div className="flex items-center flex-wrap gap-1">
-                    {/* Coming Player In-match Payment & IBAN Actions */}
-                    {isComing && (
-                      <>
+                  {/* Action Area */}
+                  {isAdmin ? (
+                    <div className="flex items-center flex-wrap gap-1">
+                      {/* Coming Player In-match Payment & IBAN Actions */}
+                      {isComing && (
+                        <>
+                          <button
+                            onClick={() => togglePayment(p.id)}
+                            title={isPaid ? 'Ödemeyi İptal Et' : 'Ödedi Olarak İşaretle'}
+                            className={`flex items-center space-x-1 px-2 py-1 rounded-lg text-[10px] font-bold border transition-all active:scale-95 ${
+                              isPaid
+                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                                : 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
+                            }`}
+                          >
+                            <Wallet className="w-3 h-3" />
+                            <span>{isPaid ? 'Ödedi ✓' : 'Ödeme Al'}</span>
+                          </button>
+
+                          <button
+                            onClick={() => openPlayerIbanWhatsApp(p)}
+                            title="Oyuncuya WhatsApp'tan IBAN ve Ücret Bilgisi Gönder"
+                            className="flex items-center space-x-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[10px] font-bold transition-all active:scale-95"
+                          >
+                            <CreditCard className="w-3 h-3 text-emerald-400" />
+                            <span>IBAN At</span>
+                          </button>
+
+                          <button
+                            onClick={() => openOneDayPlayerWhatsApp(p)}
+                            title="Yarınki Maçı Hatırlat (WhatsApp Teyit)"
+                            className="p-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 text-xs transition-all active:scale-95"
+                          >
+                            <BellRing className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      )}
+
+                      {/* Pending Ping */}
+                      {isPending && (
                         <button
-                          onClick={() => togglePayment(p.id)}
-                          title={isPaid ? 'Ödemeyi İptal Et' : 'Ödedi Olarak İşaretle'}
-                          className={`flex items-center space-x-1 px-2 py-1 rounded-lg text-[10px] font-bold border transition-all active:scale-95 ${
-                            isPaid
-                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
-                              : 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
+                          onClick={() => openPersonalWhatsAppPing(p)}
+                          title="WhatsApp'tan Durum Sor"
+                          className="flex items-center space-x-1 px-2 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold transition-all active:scale-95"
+                        >
+                          <MessageCircle className="w-3 h-3" />
+                          <span>Sor</span>
+                        </button>
+                      )}
+
+                      {/* 4 Attendance Status Buttons */}
+                      <button
+                        onClick={() => updateAttendance(p.id, 'Geliyor')}
+                        title="Geliyor Olarak İşaretle (Kadroya Alınır)"
+                        className={`px-2 py-1 rounded-lg text-[10px] font-black border transition-all ${
+                          isComing
+                            ? 'bg-emerald-500 text-black border-emerald-400 shadow-sm'
+                            : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
+                        }`}
+                      >
+                        Geliyor
+                      </button>
+
+                      <button
+                        onClick={() => updateAttendance(p.id, 'Haber Bekleniyor')}
+                        title="Haber Bekleniyor / Beklemede"
+                        className={`px-2 py-1 rounded-lg text-[10px] font-black border transition-all ${
+                          isPending
+                            ? 'bg-amber-500 text-black border-amber-400 shadow-sm'
+                            : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
+                        }`}
+                      >
+                        Bekliyor
+                      </button>
+
+                      <button
+                        onClick={() => updateAttendance(p.id, 'Gelemiyor')}
+                        title="Gelemiyor Olarak İşaretle"
+                        className={`px-2 py-1 rounded-lg text-[10px] font-black border transition-all ${
+                          isNotComing
+                            ? 'bg-slate-700 text-white border-slate-600 shadow-sm'
+                            : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
+                        }`}
+                      >
+                        Gelmiyor
+                      </button>
+
+                      <button
+                        onClick={() => updateAttendance(p.id, 'Satış koydu')}
+                        title="Son Anda Satış Koydu (-15 Ceza Puanı, Kadrodan Çıkarılır)"
+                        className={`px-2 py-1 rounded-lg text-[10px] font-black border transition-all ${
+                          isSatti
+                            ? 'bg-rose-600 text-white border-rose-500 shadow-md animate-pulse'
+                            : 'bg-rose-950/40 text-rose-300 border-rose-800/60 hover:bg-rose-900/50'
+                        }`}
+                      >
+                        Sattı 🚨
+                      </button>
+                    </div>
+                  ) : (
+                    /* Guest View */
+                    <div className="flex items-center space-x-1.5">
+                      {currentUser.playerId === p.id ? (
+                        /* Self-Attendance confirmation buttons for the logged-in player */
+                        <div className="flex items-center space-x-1 bg-slate-950/80 p-1 rounded-xl border border-blue-500/40">
+                          <button
+                            onClick={() => updateAttendance(p.id, 'Geliyor')}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-black border transition-all active:scale-95 ${
+                              isComing
+                                ? 'bg-emerald-500 text-black border-emerald-400 shadow-sm'
+                                : 'bg-slate-800 text-slate-300 border-slate-700 hover:text-white'
+                            }`}
+                          >
+                            Geliyorum ✓
+                          </button>
+                          <button
+                            onClick={() => updateAttendance(p.id, 'Gelemiyor')}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-black border transition-all active:scale-95 ${
+                              isNotComing
+                                ? 'bg-rose-600 text-white border-rose-500 shadow-sm'
+                                : 'bg-slate-800 text-slate-300 border-slate-700 hover:text-white'
+                            }`}
+                          >
+                            Gelmiyorum ✗
+                          </button>
+                        </div>
+                      ) : (
+                        /* Read-only status badge for other players */
+                        <span
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border ${
+                            isSatti
+                              ? 'bg-rose-950/40 text-rose-300 border-rose-500/40'
+                              : isComing
+                              ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40'
+                              : isPending
+                              ? 'bg-amber-950/40 text-amber-300 border-amber-500/40'
+                              : 'bg-slate-800 text-slate-400 border-slate-700'
                           }`}
                         >
-                          <Wallet className="w-3 h-3" />
-                          <span>{isPaid ? 'Ödedi ✓' : 'Ödeme Al'}</span>
-                        </button>
-
-                        <button
-                          onClick={() => openPlayerIbanWhatsApp(p)}
-                          title="Oyuncuya WhatsApp'tan IBAN ve Ücret Bilgisi Gönder"
-                          className="flex items-center space-x-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[10px] font-bold transition-all active:scale-95"
-                        >
-                          <CreditCard className="w-3 h-3 text-emerald-400" />
-                          <span>IBAN At</span>
-                        </button>
-
-                        <button
-                          onClick={() => openOneDayPlayerWhatsApp(p)}
-                          title="Yarınki Maçı Hatırlat (WhatsApp Teyit)"
-                          className="p-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 text-xs transition-all active:scale-95"
-                        >
-                          <BellRing className="w-3.5 h-3.5" />
-                        </button>
-                      </>
-                    )}
-
-                    {/* Pending Ping */}
-                    {isPending && (
-                      <button
-                        onClick={() => openPersonalWhatsAppPing(p)}
-                        title="WhatsApp'tan Durum Sor"
-                        className="flex items-center space-x-1 px-2 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold transition-all active:scale-95"
-                      >
-                        <MessageCircle className="w-3 h-3" />
-                        <span>Sor</span>
-                      </button>
-                    )}
-
-                    {/* 4 Attendance Status Buttons */}
-                    {/* 1. Geliyor */}
-                    <button
-                      onClick={() => updateAttendance(p.id, 'Geliyor')}
-                      title="Geliyor Olarak İşaretle (Kadroya Alınır)"
-                      className={`px-2 py-1 rounded-lg text-[10px] font-black border transition-all ${
-                        isComing
-                          ? 'bg-emerald-500 text-black border-emerald-400 shadow-sm'
-                          : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
-                      }`}
-                    >
-                      Geliyor
-                    </button>
-
-                    {/* 2. Bekliyor */}
-                    <button
-                      onClick={() => updateAttendance(p.id, 'Haber Bekleniyor')}
-                      title="Haber Bekleniyor / Beklemede"
-                      className={`px-2 py-1 rounded-lg text-[10px] font-black border transition-all ${
-                        isPending
-                          ? 'bg-amber-500 text-black border-amber-400 shadow-sm'
-                          : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
-                      }`}
-                    >
-                      Bekliyor
-                    </button>
-
-                    {/* 3. Gelemiyor */}
-                    <button
-                      onClick={() => updateAttendance(p.id, 'Gelemiyor')}
-                      title="Gelemiyor Olarak İşaretle"
-                      className={`px-2 py-1 rounded-lg text-[10px] font-black border transition-all ${
-                        isNotComing
-                          ? 'bg-slate-700 text-white border-slate-600 shadow-sm'
-                          : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
-                      }`}
-                    >
-                      Gelmiyor
-                    </button>
-
-                    {/* 4. Satış Koydu (Sattı 🚨) */}
-                    <button
-                      onClick={() => updateAttendance(p.id, 'Satış koydu')}
-                      title="Son Anda Satış Koydu (-15 Ceza Puanı, Kadrodan Çıkarılır)"
-                      className={`px-2 py-1 rounded-lg text-[10px] font-black border transition-all ${
-                        isSatti
-                          ? 'bg-rose-600 text-white border-rose-500 shadow-md animate-pulse'
-                          : 'bg-rose-950/40 text-rose-300 border-rose-800/60 hover:bg-rose-900/50'
-                      }`}
-                    >
-                      Sattı 🚨
-                    </button>
-                  </div>
+                          {isSatti ? 'Sattı 🚨' : isComing ? 'Geliyor' : isPending ? 'Bekliyor' : 'Gelmiyor'}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })
@@ -1116,6 +1175,11 @@ ${gelenlerLines || '(Henüz kadro kesinleşmedi)'}
           initialMode={showEditMatchModal}
           onClose={() => setShowEditMatchModal(null)}
         />
+      )}
+
+      {/* 8. AUTH ROLE SWITCH MODAL */}
+      {showAuthModal && (
+        <AuthRoleModal onClose={() => setShowAuthModal(false)} />
       )}
     </div>
   );

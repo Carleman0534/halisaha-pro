@@ -1,11 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Player, Match, Evaluator, AttendanceStatus, Position } from '../types';
+import { Player, Match, Evaluator, AttendanceStatus, Position, AppUser } from '../types';
 import {
   COUNCIL_MEMBERS,
   RAW_PLAYERS_DATA,
   INITIAL_MATCH,
   PAST_MATCHES,
   CRITERIA_KEYS,
+  ADMIN_USERS,
+  DEFAULT_GUEST_USER,
 } from '../data/initialData';
 import {
   buildInitialPlayers,
@@ -66,6 +68,10 @@ interface AppContextType {
   updateMatchDetails: (details: Partial<Match>) => void;
   applyPenalty: (playerId: string, points: number, reason?: string) => void;
   clearPenalties: (playerId: string) => void;
+  currentUser: AppUser;
+  setCurrentUser: (user: AppUser) => void;
+  isAdmin: boolean;
+  isGuest: boolean;
   firebaseActive: boolean;
   refreshFirebaseStatus: () => void;
 }
@@ -125,6 +131,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [currentEvaluator, setCurrentEvaluator] = useState<Evaluator>(COUNCIL_MEMBERS[0]);
   const [firebaseActive, setFirebaseActive] = useState<boolean>(isFirebaseConnected());
+
+  // User identity: Admin (Council: Hadi, Yasin, Muhammed, Serkan, Fatih) or Guest (Other players / visitors)
+  const [currentUser, setCurrentUser] = useState<AppUser>(() => {
+    // 1. Check if URL param exists (e.g. ?player=p_sidar or ?user=eval_hadi)
+    try {
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const playerParam = params.get('player');
+        if (playerParam) {
+          const adminMatch = ADMIN_USERS.find(a => a.playerId === playerParam);
+          if (adminMatch) return adminMatch;
+          const foundPlayer = RAW_PLAYERS_DATA.find(p => p.id === playerParam);
+          if (foundPlayer) {
+            return {
+              id: `guest_${foundPlayer.id}`,
+              name: foundPlayer.name,
+              role: 'guest',
+              playerId: foundPlayer.id,
+            };
+          }
+        }
+        const userParam = params.get('user');
+        if (userParam) {
+          const adminMatch = ADMIN_USERS.find(a => a.id === userParam);
+          if (adminMatch) return adminMatch;
+        }
+      }
+    } catch {}
+
+    // 2. Check localStorage
+    try {
+      const saved = localStorage.getItem('halisaha_current_user');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+
+    // 3. Default to Hadi Hoca (Admin)
+    return ADMIN_USERS[0];
+  });
+
+  const handleSetCurrentUser = (user: AppUser) => {
+    setCurrentUser(user);
+    try {
+      localStorage.setItem('halisaha_current_user', JSON.stringify(user));
+    } catch {}
+
+    if (user.evaluatorId) {
+      const foundEvaluator = COUNCIL_MEMBERS.find(m => m.id === user.evaluatorId);
+      if (foundEvaluator) {
+        setCurrentEvaluator(foundEvaluator);
+      }
+    }
+  };
+
+  const isAdmin = currentUser.role === 'admin';
+  const isGuest = currentUser.role === 'guest';
 
   const refreshFirebaseStatus = () => {
     setFirebaseActive(isFirebaseConnected());
@@ -712,6 +773,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setTeamFormation,
         applyPenalty,
         clearPenalties,
+        currentUser,
+        setCurrentUser: handleSetCurrentUser,
+        isAdmin,
+        isGuest,
         firebaseActive,
         refreshFirebaseStatus,
       }}

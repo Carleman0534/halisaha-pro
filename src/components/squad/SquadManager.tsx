@@ -33,6 +33,8 @@ export const SquadManager: React.FC = () => {
     assignPlayerToTeam,
     updatePlayerPositionInTeam,
     setTeamFormation,
+    isAdmin,
+    isGuest,
   } = useApp();
 
   const [copiedToast, setCopiedToast] = useState(false);
@@ -144,6 +146,7 @@ export const SquadManager: React.FC = () => {
 
   // Toggle player selection in squad
   const togglePlayerInSquad = (playerId: string) => {
+    if (!isAdmin) return;
     const isAlreadyIn = currentMatch.squad.includes(playerId);
     let nextSquad: string[];
 
@@ -161,6 +164,10 @@ export const SquadManager: React.FC = () => {
 
   // Handle tactical chip click on pitch
   const handleChipClick = (playerId: string, team: 'teamA' | 'teamB') => {
+    if (!isAdmin) {
+      // Guests cannot move players or open tactical management
+      return;
+    }
     if (selectedPlayerToSwap) {
       if (selectedPlayerToSwap.playerId === playerId) {
         setSelectedPlayerToSwap(null);
@@ -199,6 +206,17 @@ export const SquadManager: React.FC = () => {
         </div>
       )}
 
+      {/* Guest Mode Notice */}
+      {!isAdmin && (
+        <div className="flex items-center space-x-2.5 p-3 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs">
+          <Shield className="w-4 h-4 text-blue-400 shrink-0" />
+          <div>
+            <strong className="text-white block font-semibold">Misafir İzleme Modu</strong>
+            <span>Kadro ve taktik saha salt okunurdur. Kadroları dengeleme ve oyuncu transferlerini sadece Konsey Yöneticileri yapabilir.</span>
+          </div>
+        </div>
+      )}
+
       {/* MATCH FORMAT SELECTOR (5v5, 6v6, 7v7, 8v8) */}
       <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2.5">
         <div className="flex items-center justify-between">
@@ -219,8 +237,11 @@ export const SquadManager: React.FC = () => {
             return (
               <button
                 key={fmt}
-                onClick={() => setMatchFormat(fmt)}
+                disabled={!isAdmin}
+                onClick={() => isAdmin && setMatchFormat(fmt)}
                 className={`py-2 px-1 rounded-xl text-center border transition-all ${
+                  !isAdmin ? 'cursor-default opacity-85 ' : ''
+                }${
                   isFmtActive
                     ? 'bg-emerald-600 border-emerald-400 text-white shadow-md shadow-emerald-600/30 font-black'
                     : 'bg-slate-800/80 border-slate-700/60 text-slate-400 hover:text-white font-bold'
@@ -303,14 +324,16 @@ export const SquadManager: React.FC = () => {
         </div>
 
         {/* Buttons */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
-          <button
-            onClick={handleAutoBalance}
-            className="flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 transition-all active:scale-95"
-          >
-            <Wand2 className="w-4 h-4" />
-            <span>Otomatik Dengele</span>
-          </button>
+        <div className={`grid grid-cols-1 ${isAdmin ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-2 pt-1`}>
+          {isAdmin && (
+            <button
+              onClick={handleAutoBalance}
+              className="flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 transition-all active:scale-95"
+            >
+              <Wand2 className="w-4 h-4" />
+              <span>Otomatik Dengele</span>
+            </button>
+          )}
           <button
             onClick={handleShareWhatsApp}
             className="flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 font-bold text-xs transition-all active:scale-95"
@@ -329,33 +352,35 @@ export const SquadManager: React.FC = () => {
         </div>
       </div>
 
-      {/* 3 SUB-TABS: PITCH, MANUAL ASSIGNMENT, POOL SELECT */}
-      <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs font-bold">
-        <button
-          onClick={() => setActiveTab('pitch')}
-          className={`flex-1 py-2 rounded-lg transition-all ${
-            activeTab === 'pitch' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          Saha Dizilimi
-        </button>
-        <button
-          onClick={() => setActiveTab('manualTeam')}
-          className={`flex-1 py-2 rounded-lg transition-all ${
-            activeTab === 'manualTeam' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          Manuel Takımlar
-        </button>
-        <button
-          onClick={() => setActiveTab('poolSelect')}
-          className={`flex-1 py-2 rounded-lg transition-all ${
-            activeTab === 'poolSelect' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          Havuz ({currentMatch.squad.length}/{targetCount})
-        </button>
-      </div>
+      {/* 3 SUB-TABS: PITCH, MANUAL ASSIGNMENT, POOL SELECT (Admins only see full tabs) */}
+      {isAdmin && (
+        <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs font-bold">
+          <button
+            onClick={() => setActiveTab('pitch')}
+            className={`flex-1 py-2 rounded-lg transition-all ${
+              activeTab === 'pitch' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Saha Dizilimi
+          </button>
+          <button
+            onClick={() => setActiveTab('manualTeam')}
+            className={`flex-1 py-2 rounded-lg transition-all ${
+              activeTab === 'manualTeam' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Manuel Takımlar
+          </button>
+          <button
+            onClick={() => setActiveTab('poolSelect')}
+            className={`flex-1 py-2 rounded-lg transition-all ${
+              activeTab === 'poolSelect' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Havuz ({currentMatch.squad.length}/{targetCount})
+          </button>
+        </div>
+      )}
 
       {/* ============================================================ */}
       {/* TAB 1: INTERACTIVE TACTICAL PITCH WITH FORMATION SELECTION */}
@@ -368,9 +393,10 @@ export const SquadManager: React.FC = () => {
               <span className="font-bold text-rose-400">Kırmızı Diziliş:</span>
               <select
                 aria-label="Kırmızı Takım Dizilişi"
+                disabled={!isAdmin}
                 value={teamAFormation}
                 onChange={e => setTeamFormation('teamA', e.target.value)}
-                className="bg-slate-800 border border-slate-700 text-white rounded-lg px-2 py-1 font-bold text-xs focus:outline-none"
+                className={`bg-slate-800 border border-slate-700 text-white rounded-lg px-2 py-1 font-bold text-xs focus:outline-none ${!isAdmin ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
                 {formations.map(f => (
                   <option key={f} value={f}>
@@ -384,9 +410,10 @@ export const SquadManager: React.FC = () => {
               <span className="font-bold text-blue-400">Mavi Diziliş:</span>
               <select
                 aria-label="Mavi Takım Dizilişi"
+                disabled={!isAdmin}
                 value={teamBFormation}
                 onChange={e => setTeamFormation('teamB', e.target.value)}
-                className="bg-slate-800 border border-slate-700 text-white rounded-lg px-2 py-1 font-bold text-xs focus:outline-none"
+                className={`bg-slate-800 border border-slate-700 text-white rounded-lg px-2 py-1 font-bold text-xs focus:outline-none ${!isAdmin ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
                 {formations.map(f => (
                   <option key={f} value={f}>
@@ -441,7 +468,7 @@ export const SquadManager: React.FC = () => {
                 <span className="text-[11px] font-black uppercase text-rose-300 bg-rose-950/80 px-2 py-0.5 rounded border border-rose-500/30">
                   {currentMatch.teamA.name} ({currentMatch.teamA.players.length}) • {teamAFormation}
                 </span>
-                <span className="text-[10px] text-white/60">Dokunarak Yönet</span>
+                <span className="text-[10px] text-white/60">{isAdmin ? 'Dokunarak Yönet' : 'Salt Okunur'}</span>
               </div>
 
               {/* GK */}
@@ -594,7 +621,7 @@ export const SquadManager: React.FC = () => {
                 <span className="text-[11px] font-black uppercase text-blue-300 bg-blue-950/80 px-2 py-0.5 rounded border border-blue-500/30">
                   {currentMatch.teamB.name} ({currentMatch.teamB.players.length}) • {teamBFormation}
                 </span>
-                <span className="text-[10px] text-white/60">Dokunarak Yönet</span>
+                <span className="text-[10px] text-white/60">{isAdmin ? 'Dokunarak Yönet' : 'Salt Okunur'}</span>
               </div>
             </div>
           </div>

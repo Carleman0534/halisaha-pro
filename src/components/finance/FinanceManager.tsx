@@ -21,7 +21,7 @@ import { Player } from '../../types';
 import { QrPaymentModal } from './QrPaymentModal';
 
 export const FinanceManager: React.FC = () => {
-  const { currentMatch, pastMatches, players, playersMap, togglePayment } = useApp();
+  const { currentMatch, pastMatches, players, playersMap, togglePayment, isAdmin } = useApp();
 
   const [copiedIbanToast, setCopiedIbanToast] = useState(false);
   const [copiedDebtToast, setCopiedDebtToast] = useState(false);
@@ -183,17 +183,19 @@ export const FinanceManager: React.FC = () => {
           </div>
 
           <div className="flex items-center space-x-1.5">
-            <button
-              onClick={() => {
-                setEditIbanValue(iban);
-                setEditReceiverValue(receiverName);
-                setShowEditBankModal(true);
-              }}
-              title="IBAN / Hesap Bilgilerini Düzenle"
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-amber-400 transition-all active:scale-95"
-            >
-              <Edit3 className="w-4 h-4" />
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => {
+                  setEditIbanValue(iban);
+                  setEditReceiverValue(receiverName);
+                  setShowEditBankModal(true);
+                }}
+                title="IBAN / Hesap Bilgilerini Düzenle"
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-amber-400 transition-all active:scale-95"
+              >
+                <Edit3 className="w-4 h-4" />
+              </button>
+            )}
             <button
               onClick={() => setShowGeneralQr(true)}
               title="Karekod ile Ödeme Aç"
@@ -351,16 +353,28 @@ export const FinanceManager: React.FC = () => {
                     <QrCode className="w-4 h-4" />
                   </button>
 
-                  <button
-                    onClick={() => togglePayment(playerId)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      payment.isPaid
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                        : 'bg-rose-500 hover:bg-rose-600 text-white shadow-md shadow-rose-500/20'
-                    }`}
-                  >
-                    {payment.isPaid ? 'Ödedi ✓' : 'Ödemedi'}
-                  </button>
+                  {isAdmin ? (
+                    <button
+                      onClick={() => togglePayment(playerId)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        payment.isPaid
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-rose-500 hover:bg-rose-600 text-white shadow-md shadow-rose-500/20'
+                      }`}
+                    >
+                      {payment.isPaid ? 'Ödedi ✓' : 'Ödemedi'}
+                    </button>
+                  ) : (
+                    <div
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold ${
+                        payment.isPaid
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                      }`}
+                    >
+                      {payment.isPaid ? 'Ödedi ✓' : 'Ödemedi'}
+                    </div>
+                  )}
                 </div>
               </div>
             );

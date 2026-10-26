@@ -14,6 +14,7 @@ import { Player, Position } from '../../types';
 import { COUNCIL_MEMBERS, CRITERIA_KEYS } from '../../data/initialData';
 import { calculatePositionScore } from '../../utils/calculations';
 import { FifaCardModal } from './FifaCardModal';
+import { useApp } from '../../context/AppContext';
 
 interface PlayerDetailModalProps {
   player: Player;
@@ -26,6 +27,7 @@ export const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
   onClose,
   onOpenEvaluation,
 }) => {
+  const { isAdmin } = useApp();
   const [showFifaModal, setShowFifaModal] = useState(false);
   // Extract primary position score for each evaluator
   const evaluatorScores = COUNCIL_MEMBERS.map(evaluator => {
@@ -239,7 +241,7 @@ export const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
         </div>
 
         {/* Action Buttons */}
-        <div className="grid grid-cols-2 gap-2 mt-2">
+        <div className={`grid ${isAdmin ? 'grid-cols-2' : 'grid-cols-1'} gap-2 mt-2`}>
           <button
             onClick={() => setShowFifaModal(true)}
             className="py-3 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-bold rounded-xl flex items-center justify-center space-x-1.5 transition-all active:scale-95"
@@ -248,16 +250,18 @@ export const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
             <span>FIFA Kartı</span>
           </button>
 
-          <button
-            onClick={() => {
-              onClose();
-              onOpenEvaluation(player);
-            }}
-            className="py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center justify-center space-x-1.5 shadow-lg shadow-emerald-600/30 transition-all active:scale-95"
-          >
-            <Edit3 className="w-4 h-4" />
-            <span>Konsey Oyu</span>
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => {
+                onClose();
+                onOpenEvaluation(player);
+              }}
+              className="py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center justify-center space-x-1.5 shadow-lg shadow-emerald-600/30 transition-all active:scale-95"
+            >
+              <Edit3 className="w-4 h-4" />
+              <span>Konsey Oyu</span>
+            </button>
+          )}
         </div>
 
         {/* FIFA CARD MODAL */}

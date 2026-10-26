@@ -23,7 +23,7 @@ import { QuickAddPlayerModal } from './QuickAddPlayerModal';
 import { DisciplineManagerModal } from '../council/DisciplineManagerModal';
 
 export const PlayerPool: React.FC = () => {
-  const { players } = useApp();
+  const { players, isAdmin } = useApp();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPosition, setSelectedPosition] = useState<string>('ALL');
@@ -81,22 +81,26 @@ export const PlayerPool: React.FC = () => {
           <span>Davet</span>
         </button>
 
-        <button
-          onClick={() => setShowDisciplineModal(true)}
-          className="flex items-center space-x-1 py-2 px-2.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-xs font-bold transition-all active:scale-95"
-          title="Disiplin & Ceza Yönetimi"
-        >
-          <ShieldAlert className="w-4 h-4 text-rose-400" />
-          <span>Cezalar</span>
-        </button>
+        {isAdmin && (
+          <>
+            <button
+              onClick={() => setShowDisciplineModal(true)}
+              className="flex items-center space-x-1 py-2 px-2.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-xs font-bold transition-all active:scale-95"
+              title="Disiplin & Ceza Yönetimi"
+            >
+              <ShieldAlert className="w-4 h-4 text-rose-400" />
+              <span>Cezalar</span>
+            </button>
 
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="p-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/30 transition-all active:scale-95"
-          title="Yeni Oyuncu Ekle"
-        >
-          <Plus className="w-4 h-4" />
-        </button>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="p-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/30 transition-all active:scale-95"
+              title="Yeni Oyuncu Ekle"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </>
+        )}
       </div>
 
       {/* Position Filters Pills (Horizontally Scrollable) */}
@@ -189,13 +193,15 @@ export const PlayerPool: React.FC = () => {
                 >
                   <Sparkles className="w-4 h-4" />
                 </button>
-                <button
-                  onClick={() => setEvaluatingPlayer(player)}
-                  title="Konsey Oyu Ver"
-                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 transition-all active:scale-90"
-                >
-                  <Edit2 className="w-4 h-4" />
-                </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => setEvaluatingPlayer(player)}
+                    title="Konsey Oyu Ver"
+                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 transition-all active:scale-90"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                )}
                 <button
                   onClick={() => setDetailPlayer(player)}
                   title="Detayları İncele"

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Database, Users, Bell } from 'lucide-react';
+import { Shield, Database, Users, Bell, Crown, User, ChevronDown } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { COUNCIL_MEMBERS } from '../data/initialData';
 import { NotificationModal } from './common/NotificationModal';
+import { AuthRoleModal } from './auth/AuthRoleModal';
 import { getNotificationPermission } from '../services/notifications';
 
 interface HeaderProps {
@@ -10,8 +11,9 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ onOpenFirebaseModal }) => {
-  const { currentMatch, currentEvaluator, setCurrentEvaluator, firebaseActive } = useApp();
+  const { currentMatch, currentUser, isAdmin, firebaseActive } = useApp();
   const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [hasPermission, setHasPermission] = useState(false);
 
   useEffect(() => {
@@ -34,40 +36,46 @@ export const Header: React.FC<HeaderProps> = ({ onOpenFirebaseModal }) => {
               </span>
             </div>
             <p className="text-xs text-slate-400 font-medium">
-              {currentMatch.matchNumber}. Hafta • Konsey Sistemi
+              {currentMatch.matchNumber}. Hafta • {isAdmin ? 'Yönetici Modu' : 'Misafir Modu'}
             </p>
           </div>
         </div>
 
-        {/* Evaluator Selector, Notification Bell & Firebase Status */}
-        <div className="flex items-center space-x-2">
-          {/* Active Evaluator Badge/Select */}
-          <div className="relative flex items-center">
-            <div className="flex items-center space-x-1.5 bg-slate-800/80 border border-slate-700/60 rounded-lg px-2.5 py-1 text-xs text-slate-200">
-              <Users className="w-3.5 h-3.5 text-emerald-400" />
-              <select
-                aria-label="Aktif Değerlendirici Seçin"
-                value={currentEvaluator.id}
-                onChange={e => {
-                  const found = COUNCIL_MEMBERS.find(m => m.id === e.target.value);
-                  if (found) setCurrentEvaluator(found);
-                }}
-                className="bg-transparent text-xs font-semibold text-white focus:outline-none cursor-pointer pr-1"
-              >
-                {COUNCIL_MEMBERS.map(m => (
-                  <option key={m.id} value={m.id} className="bg-slate-900 text-white">
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+        {/* User Role Switcher, Notification Bell & Firebase Status */}
+        <div className="flex items-center space-x-1.5">
+          {/* Active User / Role Badge */}
+          <button
+            onClick={() => setShowAuthModal(true)}
+            title="Giriş Yapan Kullanıcıyı ve Rolü Değiştir (Yönetici / Misafir)"
+            className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all active:scale-95 shadow-sm ${
+              isAdmin
+                ? 'bg-gradient-to-r from-emerald-950/80 to-slate-900 border-emerald-500/40 text-emerald-300 hover:border-emerald-400'
+                : 'bg-gradient-to-r from-blue-950/80 to-slate-900 border-blue-500/40 text-blue-300 hover:border-blue-400'
+            }`}
+          >
+            {isAdmin ? (
+              <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            ) : (
+              <User className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+            )}
+            <span className="truncate max-w-[85px] text-white">{currentUser.name}</span>
+            <span
+              className={`text-[9px] px-1 py-0.2 rounded font-black uppercase ${
+                isAdmin
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+              }`}
+            >
+              {isAdmin ? 'Yönetici' : 'Misafir'}
+            </span>
+            <ChevronDown className="w-3 h-3 text-slate-400 ml-0.5" />
+          </button>
 
           {/* Notification Bell Button */}
           <button
             onClick={() => setShowNotificationModal(true)}
             title="Sistem Bildirimleri & Hatırlatıcılar"
-            className="relative p-2 rounded-lg border border-slate-700/60 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-all active:scale-95"
+            className="relative p-2 rounded-xl border border-slate-700/60 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-all active:scale-95"
           >
             <Bell className="w-4 h-4 text-amber-400" />
             {!hasPermission && (
@@ -79,7 +87,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenFirebaseModal }) => {
           <button
             onClick={onOpenFirebaseModal}
             title={firebaseActive ? 'Firebase Canlı Veritabanı Bağlı' : 'Yerel Depolama (Firebase için tıklayın)'}
-            className={`p-2 rounded-lg border transition-all ${
+            className={`p-2 rounded-xl border transition-all ${
               firebaseActive
                 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
                 : 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20'
@@ -93,6 +101,11 @@ export const Header: React.FC<HeaderProps> = ({ onOpenFirebaseModal }) => {
       {/* Notification Modal */}
       {showNotificationModal && (
         <NotificationModal onClose={() => setShowNotificationModal(false)} />
+      )}
+
+      {/* User Role & Auth Modal */}
+      {showAuthModal && (
+        <AuthRoleModal onClose={() => setShowAuthModal(false)} />
       )}
     </header>
   );

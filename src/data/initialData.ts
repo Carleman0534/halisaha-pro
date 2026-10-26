@@ -1,4 +1,4 @@
-import { Position, Evaluator, CouncilRule, CriterionRubric, Player, Match } from '../types';
+import { Position, Evaluator, CouncilRule, CriterionRubric, Player, Match, AppUser } from '../types';
 
 export const CRITERIA_KEYS = [
   { key: 'pas', label: 'Pas' },
@@ -95,6 +95,20 @@ export const COUNCIL_MEMBERS: Evaluator[] = [
   { id: 'eval_yasin', name: 'Yasin', role: 'council_member' },
   { id: 'eval_muhammed', name: 'Muhammed', role: 'council_member' },
 ];
+
+export const ADMIN_USERS: AppUser[] = [
+  { id: 'eval_hadi', name: 'Hadi Hoca', role: 'admin', playerId: 'p_hadi_alizadeh', evaluatorId: 'eval_hadi' },
+  { id: 'eval_yasin', name: 'Yasin Turan', role: 'admin', playerId: 'p_yasin_turan', evaluatorId: 'eval_yasin' },
+  { id: 'eval_muhammed', name: 'Muhammed Ergen', role: 'admin', playerId: 'p_muhammed_ergen', evaluatorId: 'eval_muhammed' },
+  { id: 'eval_serkan', name: 'Serkan Ayrıca', role: 'admin', playerId: 'p_serkan_ayrica', evaluatorId: 'eval_serkan' },
+  { id: 'eval_fatih', name: 'Fatih Yetgin', role: 'admin', playerId: 'p_fatih_yetgin', evaluatorId: 'eval_fatih' },
+];
+
+export const DEFAULT_GUEST_USER: AppUser = {
+  id: 'guest_general',
+  name: 'Misafir İzleyici',
+  role: 'guest',
+};
 
 export const COUNCIL_RULES: CouncilRule[] = [
   {
