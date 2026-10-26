@@ -1,0 +1,492 @@
+import React, { useState } from 'react';
+import {
+  Calendar,
+  Clock,
+  MapPin,
+  CircleDollarSign,
+  Trophy,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  Plus,
+  ArrowRight,
+  Sparkles,
+  Crown,
+  Flame,
+} from 'lucide-react';
+import confetti from 'canvas-confetti';
+import { useApp } from '../../context/AppContext';
+import { AttendanceStatus } from '../../types';
+
+import { EmergencySubstituteFinder } from './EmergencySubstituteFinder';
+
+interface MatchPlannerProps {
+  onNavigateToSquad: () => void;
+}
+
+export const MatchPlanner: React.FC<MatchPlannerProps> = ({ onNavigateToSquad }) => {
+  const { currentMatch, pastMatches, playersMap, updateAttendance, setMatchScores, createNewMatch, voteMvp } =
+    useApp();
+
+  const [showAttendanceModal, setShowAttendanceModal] = useState(false);
+  const [showScoreModal, setShowScoreModal] = useState(false);
+  const [showNewMatchModal, setShowNewMatchModal] = useState(false);
+  const [showMvpModal, setShowMvpModal] = useState(false);
+
+  const [scoreA, setScoreA] = useState(currentMatch.teamA.score ?? 6);
+  const [scoreB, setScoreB] = useState(currentMatch.teamB.score ?? 5);
+
+  const [newDate, setNewDate] = useState('2026-11-04');
+  const [newTime, setNewTime] = useState('21:00 - 22:00');
+  const [newCost, setNewCost] = useState(2800);
+  const [newVenue, setNewVenue] = useState('Olimpiyat Halı Saha Tesisleri');
+
+  return (
+    <div className="space-y-4 pb-20">
+      {/* 3 NUMARALI MODÜL: TARİH, TOPLAM GELEN SAYISI, HABER BEKLENENLER & ACİL ÇAĞRI */}
+      <EmergencySubstituteFinder onNavigateToSquad={onNavigateToSquad} />
+
+      {/* Maç Sonu İşlemleri & Skor Girişi Çubuğu */}
+      <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+        <div>
+          <span className="text-xs font-bold text-white block">Maç Oynandı mı?</span>
+          <span className="text-[10px] text-slate-400">Skoru girip maçı arşive kaydedin</span>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setShowAttendanceModal(true)}
+            className="flex items-center space-x-1 py-1.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold transition-all active:scale-95"
+          >
+            <CheckCircle2 className="w-3.5 h-3.5 text-amber-400" />
+            <span>Ceza Yoklaması</span>
+          </button>
+
+          <button
+            onClick={() => setShowScoreModal(true)}
+            className="flex items-center space-x-1 py-1.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-black shadow-md shadow-amber-500/20 transition-all active:scale-95"
+          >
+            <Trophy className="w-3.5 h-3.5" />
+            <span>Skor Gir</span>
+          </button>
+        </div>
+      </div>
+
+      {/* MVP OF THE MATCH (Maçın Adamı) CARD */}
+      <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-950/60 via-slate-900 to-slate-900 border border-amber-500/30 space-y-3 shadow-xl">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center">
+              <Crown className="w-4 h-4 animate-bounce" />
+            </div>
+            <div>
+              <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center space-x-1">
+                <span>Haftanın MVP'si (Maçın Adamı)</span>
+              </h3>
+              <p className="text-[10px] text-slate-400">Grup üyeleri tarafından oylanan maçın yıldızı</p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setShowMvpModal(true)}
+            className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-black text-xs shadow-md shadow-amber-500/20 transition-all active:scale-95"
+          >
+            Oy Ver
+          </button>
+        </div>
+
+        {/* Current MVP Leader Display */}
+        {(() => {
+          const mvpVotes = currentMatch.mvpVotes || {};
+          const totalVotes = Object.values(mvpVotes).reduce((a, b) => a + b, 0);
+          const sortedCandidates = Object.entries(mvpVotes).sort((a, b) => b[1] - a[1]);
+          const leaderEntry = sortedCandidates[0];
+          const leader = leaderEntry ? playersMap[leaderEntry[0]] : null;
+
+          if (!leader || totalVotes === 0) {
+            return (
+              <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-400 text-center">
+                Henüz MVP oyu kullanılmadı. Maçın adamını belirlemek için ilk oyu verin!
+              </div>
+            );
+          }
+
+          const leaderVotes = leaderEntry[1];
+          const leaderPercent = Math.round((leaderVotes / totalVotes) * 100);
+
+          return (
+            <div className="p-3 rounded-xl bg-slate-900/80 border border-amber-500/30 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center space-x-2">
+                  <span className="text-lg">👑</span>
+                  <div>
+                    <span className="font-black text-white block">{leader.name}</span>
+                    <span className="text-[10px] text-amber-400 font-semibold">{leader.primaryPosition}</span>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <span className="text-sm font-black text-amber-400 font-mono">{leaderVotes} Oy</span>
+                  <span className="text-[10px] text-slate-400 block">(%{leaderPercent})</span>
+                </div>
+              </div>
+
+              {/* Vote progress bar */}
+              <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-amber-500 to-yellow-300 rounded-full transition-all duration-500"
+                  style={{ width: `${leaderPercent}%` }}
+                />
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+
+      {/* Action to create next match */}
+      <div className="flex items-center justify-between px-1">
+        <h3 className="text-sm font-bold text-slate-200">Geçmiş Maçlar & Skorlar</h3>
+        <button
+          onClick={() => setShowNewMatchModal(true)}
+          className="flex items-center space-x-1 text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition-colors"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>Yeni Maç Planla</span>
+        </button>
+      </div>
+
+      {/* Past Matches List */}
+      <div className="space-y-2.5">
+        {pastMatches.map(m => (
+          <div
+            key={m.id}
+            className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 transition-all"
+          >
+            <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
+              <span className="font-semibold text-slate-300">
+                {m.matchNumber}. Hafta • {new Date(m.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
+              </span>
+              <span>{m.pitchNo}</span>
+            </div>
+
+            {/* Scoreboard */}
+            <div className="flex items-center justify-between bg-slate-950/60 rounded-xl p-3 border border-slate-800/60 mb-2">
+              <div className="flex items-center space-x-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                <span className="text-xs font-bold text-white">{m.teamA.name}</span>
+              </div>
+
+              <div className="flex items-center space-x-2 font-mono font-black text-lg text-white">
+                <span className={m.teamA.score! > m.teamB.score! ? 'text-emerald-400' : ''}>
+                  {m.teamA.score ?? 0}
+                </span>
+                <span className="text-slate-500 text-sm">-</span>
+                <span className={m.teamB.score! > m.teamA.score! ? 'text-emerald-400' : ''}>
+                  {m.teamB.score ?? 0}
+                </span>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-bold text-white">{m.teamB.name}</span>
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+              </div>
+            </div>
+
+            {m.notes && <p className="text-[11px] text-slate-400 italic line-clamp-1">"{m.notes}"</p>}
+          </div>
+        ))}
+      </div>
+
+      {/* ATTENDANCE MODAL */}
+      {showAttendanceModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-2xl max-w-md w-full max-h-[85vh] flex flex-col p-5 shadow-2xl animate-in slide-in-from-bottom">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
+              <div>
+                <h3 className="font-bold text-white text-base">Maç Yoklaması</h3>
+                <p className="text-xs text-slate-400">Ceza ve askı durumlarını otomatik günceller</p>
+              </div>
+              <button
+                onClick={() => setShowAttendanceModal(false)}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="overflow-y-auto space-y-2.5 pr-1 flex-1">
+              {currentMatch.squad.map(playerId => {
+                const player = playersMap[playerId];
+                if (!player) return null;
+                const status = currentMatch.attendance[playerId] || 'Beklemede';
+
+                return (
+                  <div
+                    key={playerId}
+                    className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/50 flex items-center justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center space-x-1.5">
+                        <span className="font-bold text-sm text-white">{player.name}</span>
+                        {player.isJoker && (
+                          <span className="text-[9px] px-1 py-0.5 rounded bg-purple-500/20 text-purple-300 font-semibold">
+                            Joker
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs text-slate-400">
+                        Ceza Puanı: <strong className="text-amber-400">{player.attendanceStats.penaltyPoints}</strong>
+                      </span>
+                    </div>
+
+                    {/* Attendance Status Buttons */}
+                    <div className="flex items-center space-x-1">
+                      <button
+                        onClick={() => updateAttendance(playerId, 'Geldi')}
+                        title="Geldi (0 Ceza)"
+                        className={`p-1.5 rounded-lg border text-xs font-semibold transition-all ${
+                          status === 'Geldi'
+                            ? 'bg-emerald-500 border-emerald-400 text-white shadow-sm shadow-emerald-500/50'
+                            : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'
+                        }`}
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => updateAttendance(playerId, 'Son dakika iptal')}
+                        title="Son Dakika İptal (+1 Ceza Puanı)"
+                        className={`p-1.5 rounded-lg border text-xs font-semibold transition-all ${
+                          status === 'Son dakika iptal'
+                            ? 'bg-amber-500 border-amber-400 text-black shadow-sm shadow-amber-500/50'
+                            : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'
+                        }`}
+                      >
+                        <AlertTriangle className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => updateAttendance(playerId, 'Gelmedi')}
+                        title="Gelmedi (+2 Ceza Puanı)"
+                        className={`p-1.5 rounded-lg border text-xs font-semibold transition-all ${
+                          status === 'Gelmedi'
+                            ? 'bg-rose-500 border-rose-400 text-white shadow-sm shadow-rose-500/50'
+                            : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'
+                        }`}
+                      >
+                        <XCircle className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={() => setShowAttendanceModal(false)}
+              className="mt-4 w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all"
+            >
+              Tamamla
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* SCORE MODAL */}
+      {showScoreModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-5 shadow-2xl">
+            <h3 className="font-bold text-white text-base mb-1">Maç Skorunu Gir</h3>
+            <p className="text-xs text-slate-400 mb-4">Skor girildiğinde maç geçmişe kaydedilir.</p>
+
+            <div className="grid grid-cols-2 gap-4 text-center mb-6">
+              <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700">
+                <span className="text-xs font-bold text-rose-400">{currentMatch.teamA.name}</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="30"
+                  value={scoreA}
+                  onChange={e => setScoreA(parseInt(e.target.value) || 0)}
+                  className="w-full text-center text-3xl font-black font-mono bg-transparent text-white focus:outline-none mt-2"
+                />
+              </div>
+              <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700">
+                <span className="text-xs font-bold text-blue-400">{currentMatch.teamB.name}</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="30"
+                  value={scoreB}
+                  onChange={e => setScoreB(parseInt(e.target.value) || 0)}
+                  className="w-full text-center text-3xl font-black font-mono bg-transparent text-white focus:outline-none mt-2"
+                />
+              </div>
+            </div>
+
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setShowScoreModal(false)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs"
+              >
+                İptal
+              </button>
+              <button
+                onClick={() => {
+                  setMatchScores(scoreA, scoreB);
+                  setShowScoreModal(false);
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30"
+              >
+                Kaydet & Bitir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* NEW MATCH MODAL */}
+      {showNewMatchModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
+            <div>
+              <h3 className="font-bold text-white text-base">Yeni Hafta Maçı Planla</h3>
+              <p className="text-xs text-slate-400">Tarih ve saha rezervasyon bilgilerini girin</p>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-[11px] font-semibold text-slate-300 block mb-1">Maç Tarihi</label>
+                <input
+                  type="date"
+                  value={newDate}
+                  onChange={e => setNewDate(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold text-slate-300 block mb-1">Saat Aralığı</label>
+                <input
+                  type="text"
+                  value={newTime}
+                  onChange={e => setNewTime(e.target.value)}
+                  placeholder="21:00 - 22:00"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold text-slate-300 block mb-1">Saha Ücreti (TL)</label>
+                <input
+                  type="number"
+                  value={newCost}
+                  onChange={e => setNewCost(parseInt(e.target.value) || 2800)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold text-slate-300 block mb-1">Saha / Tesis Adı</label>
+                <input
+                  type="text"
+                  value={newVenue}
+                  onChange={e => setNewVenue(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
+                />
+              </div>
+            </div>
+
+            <div className="flex space-x-2 pt-2">
+              <button
+                onClick={() => setShowNewMatchModal(false)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold text-xs"
+              >
+                Vazgeç
+              </button>
+              <button
+                onClick={() => {
+                  createNewMatch(newDate, newTime, newCost, newVenue);
+                  setShowNewMatchModal(false);
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs"
+              >
+                Oluştur
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MVP VOTING MODAL */}
+      {showMvpModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-2xl max-w-sm w-full max-h-[85vh] flex flex-col p-5 shadow-2xl animate-in slide-in-from-bottom">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
+              <div className="flex items-center space-x-2">
+                <Crown className="w-5 h-5 text-amber-400" />
+                <div>
+                  <h3 className="font-bold text-white text-base">Maçın Adamını Seç</h3>
+                  <p className="text-xs text-slate-400">14 kişilik kadrodan oyunuzu verin</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowMvpModal(false)}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="overflow-y-auto space-y-2 pr-1 flex-1">
+              {currentMatch.squad.map(playerId => {
+                const player = playersMap[playerId];
+                if (!player) return null;
+                const votes = currentMatch.mvpVotes?.[playerId] || 0;
+
+                return (
+                  <button
+                    key={playerId}
+                    onClick={() => {
+                      voteMvp(playerId);
+                      try {
+                        confetti({
+                          particleCount: 40,
+                          spread: 60,
+                          origin: { y: 0.6 },
+                          colors: ['#f59e0b', '#fbbf24', '#10b981'],
+                        });
+                      } catch {}
+                      setShowMvpModal(false);
+                    }}
+                    className="w-full p-3 rounded-xl bg-slate-800/60 hover:bg-amber-500/10 border border-slate-700/60 hover:border-amber-500/40 flex items-center justify-between text-left transition-all active:scale-95 group"
+                  >
+                    <div className="flex items-center space-x-2.5">
+                      <div className="w-8 h-8 rounded-full bg-slate-700 group-hover:bg-amber-500/20 text-slate-200 group-hover:text-amber-400 flex items-center justify-center font-black text-xs">
+                        {player.name.charAt(0)}
+                      </div>
+                      <div>
+                        <span className="font-bold text-sm text-white group-hover:text-amber-300 block">
+                          {player.name}
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-medium">
+                          {player.primaryPosition} • {player.finalScore}p
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-1.5">
+                      {votes > 0 && (
+                        <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                          {votes} Oy
+                        </span>
+                      )}
+                      <span className="text-xs font-bold text-slate-400 group-hover:text-amber-400">
+                        Seç →
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
