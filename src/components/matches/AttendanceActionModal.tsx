@@ -12,15 +12,27 @@ import {
   ArrowRight,
   X,
   BellRing,
+  ShieldCheck,
+  RotateCcw,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useApp } from '../../context/AppContext';
+import { isPlayerExemptForMatch } from '../../utils/permissions';
+import { AppUser } from '../../types';
 
 export const AttendanceActionModal: React.FC = () => {
-  const { currentUser, currentMatch, updateAttendance, playersMap } = useApp();
+  const {
+    currentUser,
+    setCurrentUser,
+    currentMatch,
+    updateAttendance,
+    playersMap,
+    players,
+  } = useApp();
 
   const [isOpen, setIsOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'prompt' | 'confirmed' | 'declined'>('prompt');
+  const [activePlayerId, setActivePlayerId] = useState<string>('');
   const [copiedIban, setCopiedIban] = useState(false);
 
   useEffect(() => {
@@ -28,37 +40,103 @@ export const AttendanceActionModal: React.FC = () => {
       if (typeof window === 'undefined') return;
 
       const params = new URLSearchParams(window.location.search);
-      const action = params.get('action');
-      const playerParam = params.get('player');
+      const playerParam =
+        params.get('oyuncu') ||
+        params.get('player') ||
+        params.get('p');
 
-      // Check if action was provided in URL
-      if (action && (action === 'confirm' || action === 'decline' || action === 'geliyorum' || action === 'gelmiyorum')) {
-        const isConfirm = action === 'confirm' || action === 'geliyorum';
-        const targetPlayerId = playerParam || currentUser.playerId;
+      const actionParam =
+        params.get('durum') ||
+        params.get('action') ||
+        params.get('d');
 
-        if (targetPlayerId) {
+      // 1. Direct 1-tap WhatsApp attendance link detection
+      if (playerParam) {
+        const foundPlayer = playersMap[playerParam] || players.find(p => p.id === playerParam);
+
+        if (foundPlayer) {
+          setActivePlayerId(foundPlayer.id);
+
+          // Auto-login session as this player
+          const playerUser: AppUser = {
+            id: `player_${foundPlayer.id}`,
+            name: foundPlayer.name,
+            role: 'player',
+            playerId: foundPlayer.id,
+          };
+          setCurrentUser(playerUser);
+
+          const act = actionParam ? actionParam.toLowerCase().trim() : null;
+          const isConfirm =
+            act === 'geliyorum' ||
+            act === 'confirm' ||
+            act === 'geldi' ||
+            act === 'evet';
+          const isDecline =
+            act === 'gelmiyorum' ||
+            act === 'decline' ||
+            act === 'gelemiyor' ||
+            act === 'hayir';
+
           if (isConfirm) {
-            updateAttendance(targetPlayerId, 'Geliyor');
+            updateAttendance(foundPlayer.id, 'Geliyor');
             setModalMode('confirmed');
+            setIsOpen(true);
             try {
-              confetti({ particleCount: 50, spread: 70, origin: { y: 0.6 } });
+              confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
             } catch {}
-          } else {
-            updateAttendance(targetPlayerId, 'Gelemiyor');
+          } else if (isDecline) {
+            updateAttendance(foundPlayer.id, 'Gelemiyor');
             setModalMode('declined');
+            setIsOpen(true);
+          } else {
+            // Player link with no explicit action -> open prompt directly
+            setModalMode('prompt');
+            setIsOpen(true);
           }
-          setIsOpen(true);
 
-          // Clean up action parameter from URL without reloading
+          // Clean up URL parameters cleanly
           const newUrl = new URL(window.location.href);
+          newUrl.searchParams.delete('oyuncu');
+          newUrl.searchParams.delete('player');
+          newUrl.searchParams.delete('p');
+          newUrl.searchParams.delete('durum');
           newUrl.searchParams.delete('action');
+          newUrl.searchParams.delete('d');
           window.history.replaceState({}, '', newUrl.toString());
           return;
         }
       }
 
-      // If user is logged in as a player and their attendance is pending, show prompt
+      // 2. Action without player param (uses currentUser)
+      if (actionParam && currentUser.playerId) {
+        const act = actionParam.toLowerCase().trim();
+        const isConfirm = act === 'geliyorum' || act === 'confirm' || act === 'geldi';
+        setActivePlayerId(currentUser.playerId);
+
+        if (isConfirm) {
+          updateAttendance(currentUser.playerId, 'Geliyor');
+          setModalMode('confirmed');
+          try {
+            confetti({ particleCount: 60, spread: 80, origin: { y: 0.6 } });
+          } catch {}
+        } else {
+          updateAttendance(currentUser.playerId, 'Gelemiyor');
+          setModalMode('declined');
+        }
+        setIsOpen(true);
+
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('durum');
+        newUrl.searchParams.delete('action');
+        newUrl.searchParams.delete('d');
+        window.history.replaceState({}, '', newUrl.toString());
+        return;
+      }
+
+      // 3. Fallback: If logged in as player and pending confirmation
       if (currentUser.playerId) {
+        setActivePlayerId(currentUser.playerId);
         const status = currentMatch.attendance[currentUser.playerId] || 'Haber Bekleniyor';
         const isPending = status === 'Haber Bekleniyor' || status === 'Beklemede';
         const dismissedKey = `halisaha_prompt_dismissed_${currentMatch.id}_${currentUser.playerId}`;
@@ -73,11 +151,12 @@ export const AttendanceActionModal: React.FC = () => {
     }
   }, [currentUser.playerId, currentMatch.id]);
 
-  if (!isOpen || !currentUser.playerId) return null;
+  const targetId = activePlayerId || currentUser.playerId;
+  if (!isOpen || !targetId) return null;
 
-  const myId = currentUser.playerId;
-  const playerName = currentUser.name || playersMap[myId]?.name || 'Oyuncu';
-  const targetCount = currentMatch.targetSquadCount || 14;
+  const targetPlayer = playersMap[targetId];
+  const playerName = targetPlayer ? targetPlayer.name : currentUser.name || 'Oyuncu';
+  const exemptionInfo = isPlayerExemptForMatch(targetPlayer, currentMatch);
 
   const d = new Date(currentMatch.date);
   const dateFormatted = d.toLocaleDateString('tr-TR', {
@@ -87,7 +166,7 @@ export const AttendanceActionModal: React.FC = () => {
   });
 
   const handleConfirmComing = () => {
-    updateAttendance(myId, 'Geliyor');
+    updateAttendance(targetId, 'Geliyor');
     setModalMode('confirmed');
     try {
       confetti({ particleCount: 60, spread: 80, origin: { y: 0.6 } });
@@ -95,12 +174,12 @@ export const AttendanceActionModal: React.FC = () => {
   };
 
   const handleConfirmDeclining = () => {
-    updateAttendance(myId, 'Gelemiyor');
+    updateAttendance(targetId, 'Gelemiyor');
     setModalMode('declined');
   };
 
   const handleClose = () => {
-    const dismissedKey = `halisaha_prompt_dismissed_${currentMatch.id}_${currentUser.playerId}`;
+    const dismissedKey = `halisaha_prompt_dismissed_${currentMatch.id}_${targetId}`;
     sessionStorage.setItem(dismissedKey, 'true');
     setIsOpen(false);
   };
@@ -116,13 +195,13 @@ export const AttendanceActionModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-700/80 rounded-3xl max-w-sm w-full p-5 shadow-2xl space-y-4 animate-in zoom-in-95">
+    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+      <div className="bg-slate-900 border border-slate-700/80 rounded-3xl max-w-sm w-full p-5 shadow-2xl space-y-4 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto my-auto">
         {/* Top close button */}
         <div className="flex justify-end">
           <button
             onClick={handleClose}
-            className="text-slate-400 hover:text-white p-1 rounded-lg bg-slate-800/80"
+            className="text-slate-400 hover:text-white p-1 rounded-lg bg-slate-800/80 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -139,7 +218,7 @@ export const AttendanceActionModal: React.FC = () => {
 
             <div className="space-y-1">
               <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">
-                YÖNETİCİ MAÇ TEYİT BİLDİRİMİ
+                MAÇ KATILIM TEYİDİ
               </span>
               <h3 className="text-lg font-black text-white">
                 Selam {playerName} ⚽🔥
@@ -165,7 +244,11 @@ export const AttendanceActionModal: React.FC = () => {
               </div>
               <div className="flex items-center justify-between pt-1 border-t border-slate-800 text-[11px]">
                 <span className="text-slate-400">Kişi Başı Ücret:</span>
-                <span className="font-bold text-amber-400 font-mono">{currentMatch.costPerPlayer} ₺</span>
+                {exemptionInfo.isExempt ? (
+                  <span className="font-bold text-emerald-400">0 ₺ (🛡️ Muafsınız)</span>
+                ) : (
+                  <span className="font-bold text-amber-400 font-mono">{currentMatch.costPerPlayer} ₺</span>
+                )}
               </div>
             </div>
 
@@ -184,7 +267,7 @@ export const AttendanceActionModal: React.FC = () => {
                 className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-300 border border-slate-700 font-bold text-xs transition-all active:scale-95 flex items-center justify-center space-x-1.5"
               >
                 <XCircle className="w-4 h-4" />
-                <span>GELMİYORUM</span>
+                <span>GELEMİYORUM</span>
               </button>
             </div>
           </div>
@@ -211,6 +294,19 @@ export const AttendanceActionModal: React.FC = () => {
               </p>
             </div>
 
+            {/* Exemption Notice if Exempt */}
+            {exemptionInfo.isExempt && (
+              <div className="p-2.5 rounded-xl bg-purple-950/40 border border-purple-800/60 text-center space-y-0.5">
+                <div className="flex items-center justify-center space-x-1.5 text-purple-300 font-bold text-xs">
+                  <ShieldCheck className="w-4 h-4 text-purple-400" />
+                  <span>0 ₺ — Ödeme Muafiyetiniz Var</span>
+                </div>
+                <p className="text-[10px] text-purple-200/80">
+                  {exemptionInfo.reason || 'Bu maç için saha ücreti ödemeniz gerekmemektedir.'}
+                </p>
+              </div>
+            )}
+
             {/* Match summary */}
             <div className="p-3 bg-slate-950/80 border border-emerald-500/30 rounded-2xl text-left text-xs space-y-1">
               <div className="flex justify-between">
@@ -227,27 +323,33 @@ export const AttendanceActionModal: React.FC = () => {
               </div>
               <div className="flex justify-between pt-1 border-t border-slate-800">
                 <span className="text-slate-400">Ücret:</span>
-                <span className="font-bold text-amber-400 font-mono">{currentMatch.costPerPlayer} ₺</span>
+                {exemptionInfo.isExempt ? (
+                  <span className="font-bold text-emerald-400 font-mono">0 ₺ (Muaf)</span>
+                ) : (
+                  <span className="font-bold text-amber-400 font-mono">{currentMatch.costPerPlayer} ₺</span>
+                )}
               </div>
             </div>
 
             <div className="space-y-2">
-              <button
-                onClick={handleCopyIban}
-                className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-all active:scale-95 flex items-center justify-center space-x-1.5"
-              >
-                {copiedIban ? (
-                  <>
-                    <Check className="w-4 h-4 text-emerald-400" />
-                    <span className="text-emerald-400">IBAN Kopyalandı!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-4 h-4 text-amber-400" />
-                    <span>Ödeme İçin IBAN Kopyala</span>
-                  </>
-                )}
-              </button>
+              {!exemptionInfo.isExempt && (
+                <button
+                  onClick={handleCopyIban}
+                  className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-all active:scale-95 flex items-center justify-center space-x-1.5"
+                >
+                  {copiedIban ? (
+                    <>
+                      <Check className="w-4 h-4 text-emerald-400" />
+                      <span className="text-emerald-400">IBAN Kopyalandı!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4 text-amber-400" />
+                      <span>Ödeme İçin IBAN Kopyala</span>
+                    </>
+                  )}
+                </button>
+              )}
 
               <button
                 onClick={handleClose}
@@ -281,12 +383,22 @@ export const AttendanceActionModal: React.FC = () => {
               </p>
             </div>
 
-            <button
-              onClick={handleClose}
-              className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition-all active:scale-95"
-            >
-              Tamam
-            </button>
+            <div className="space-y-2 pt-1">
+              <button
+                onClick={handleConfirmComing}
+                className="w-full py-2.5 px-3 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 font-bold text-xs transition-all active:scale-95 flex items-center justify-center space-x-1.5"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Fikrim Değişti, Maça Geliyorum!</span>
+              </button>
+
+              <button
+                onClick={handleClose}
+                className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition-all active:scale-95"
+              >
+                Tamam
+              </button>
+            </div>
           </div>
         )}
       </div>

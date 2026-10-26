@@ -346,7 +346,7 @@ ${
   const getConfirmUrl = (playerId: string) => {
     try {
       const origin = window.location.origin + window.location.pathname;
-      return `${origin}?player=${playerId}`;
+      return `${origin}?oyuncu=${playerId}`;
     } catch {
       return '';
     }
@@ -354,8 +354,8 @@ ${
 
   const openPersonalWhatsAppPing = (player: Player) => {
     const confirmUrl = getConfirmUrl(player.id);
-    const yesUrl = `${confirmUrl}&action=confirm`;
-    const noUrl = `${confirmUrl}&action=decline`;
+    const yesUrl = `${confirmUrl}&durum=geliyorum`;
+    const noUrl = `${confirmUrl}&durum=gelmiyorum`;
     const d = new Date(currentMatch.date);
     const day = d.toLocaleDateString('tr-TR', { weekday: 'long' });
     const timeOnly = currentMatch.time.split('-')[0].trim();
@@ -373,8 +373,8 @@ ${
 
   const openSubInviteWhatsApp = (player: Player) => {
     const confirmUrl = getConfirmUrl(player.id);
-    const yesUrl = `${confirmUrl}&action=confirm`;
-    const noUrl = `${confirmUrl}&action=decline`;
+    const yesUrl = `${confirmUrl}&durum=geliyorum`;
+    const noUrl = `${confirmUrl}&durum=gelmiyorum`;
     const d = new Date(currentMatch.date);
     const day = d.toLocaleDateString('tr-TR', { weekday: 'long' });
     const timeOnly = currentMatch.time.split('-')[0].trim();
@@ -393,8 +393,8 @@ ${
 
   const openOneDayPlayerWhatsApp = (player: Player) => {
     const confirmUrl = getConfirmUrl(player.id);
-    const yesUrl = `${confirmUrl}&action=confirm`;
-    const noUrl = `${confirmUrl}&action=decline`;
+    const yesUrl = `${confirmUrl}&durum=geliyorum`;
+    const noUrl = `${confirmUrl}&durum=gelmiyorum`;
     const timeOnly = currentMatch.time.split('-')[0].trim();
     const text = encodeURIComponent(
       `⏰ *YARINKİ MAÇ SON TEYİT BİLDİRİMİ* ⏰\n\n` +

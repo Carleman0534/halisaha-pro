@@ -11,9 +11,11 @@ import {
   Clock,
   MapPin,
   Flame,
+  Zap,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useApp } from '../../context/AppContext';
+import { isPlayerExemptForMatch } from '../../utils/permissions';
 import { Player } from '../../types';
 
 interface WhatsAppInviteModalProps {
@@ -25,7 +27,7 @@ export const WhatsAppInviteModal: React.FC<WhatsAppInviteModalProps> = ({ player
   const { currentMatch, players } = useApp();
 
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>(player?.id || players[0]?.id || '');
-  const [templateType, setTemplateType] = useState<'short' | 'oneday' | 'detailed' | 'urgent'>('oneday');
+  const [templateType, setTemplateType] = useState<'onestep' | 'short' | 'oneday' | 'urgent'>('onestep');
   const [customMessage, setCustomMessage] = useState<string>('');
   const [copied, setCopied] = useState(false);
 
@@ -46,33 +48,85 @@ export const WhatsAppInviteModal: React.FC<WhatsAppInviteModalProps> = ({ player
     }
   }, [currentMatch.date, currentMatch.time]);
 
-  // Generated templates
+  // Generate 1-tap participation links for this active player
+  const { linkYes, linkNo, linkKadro } = useMemo(() => {
+    try {
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      const path = typeof window !== 'undefined' ? window.location.pathname : '';
+      const base = `${origin}${path}`;
+      const pId = activePlayer?.id || '';
+      return {
+        linkYes: `${base}?oyuncu=${pId}&durum=geliyorum`,
+        linkNo: `${base}?oyuncu=${pId}&durum=gelmiyorum`,
+        linkKadro: `${base}?oyuncu=${pId}`,
+      };
+    } catch {
+      return { linkYes: '', linkNo: '', linkKadro: '' };
+    }
+  }, [activePlayer]);
+
+  // Check if player has payment exemption
+  const exemption = isPlayerExemptForMatch(activePlayer, currentMatch);
+  const feeText = exemption.isExempt
+    ? '0 ₺ (🛡️ Sen Muafsın)'
+    : `${currentMatch.costPerPlayer} ₺`;
+
+  // Generated templates with 1-tap links
   const generatedText = useMemo(() => {
     const name = activePlayer ? activePlayer.name : 'dostum';
     const pos = activePlayer ? activePlayer.primaryPosition : 'oyuncu';
 
+    // 1. One-step direct response invite (RECOMMENDED)
+    if (templateType === 'onestep') {
+      return `⚽ *HALI SAHA PRO — MAÇ DAVETİ* ⚽
+
+Selam *${name}*, ${dayName} günü saat ${timeOnly}'de maç kadrosuna çağrıldın! 🔥
+📍 *Saha:* ${currentMatch.venueName}
+💰 *Ücret:* ${feeText}
+
+Lütfen katılım durumunu aşağıdaki linke dokunarak tek tıkla bildir:
+
+✅ *GELİYORUM:*
+${linkYes}
+
+❌ *GELMİYORUM:*
+${linkNo}
+
+📋 *Kadro ve Detayları Gör:*
+${linkKadro}`;
+    }
+
+    // 2. 1 day countdown reminder
     if (templateType === 'oneday') {
-      return `Selam ${name}, yarın saat ${timeOnly}'de halı saha maçımız var, unutmadın değil mi? Çantaları bu akşamdan hazırla, görüşürüz! ⚽🔥
-📍 Saha: ${currentMatch.venueName} (${currentMatch.pitchNo})`;
+      return `⏰ *YARIN HALI SAHA MAÇI VAR!* ⏰
+
+Selam *${name}*, yarın saat ${timeOnly}'de halı saha maçımız var, unutmadın değil mi? ⚽🔥
+📍 *Saha:* ${currentMatch.venueName}
+💰 *Ücret:* ${feeText}
+
+Kadro netleştiriliyor. Katılımını tek tıkla onayla:
+✅ *GELİYORUM:* ${linkYes}
+❌ *GELMİYORUM:* ${linkNo}`;
     }
 
-    if (templateType === 'short') {
-      // EXACT format requested: "... günü ... saatinde maçımız var gelmek istermisin"
-      return `Selam ${name}, ${dayName} günü saat ${timeOnly}'de maçımız var, gelmek ister misin? ⚽🔥
-Saha: ${currentMatch.venueName}`;
+    // 3. Urgent substitute call
+    if (templateType === 'urgent') {
+      return `🚨 *ACİL YEDEK OYUNCU ÇAĞRISI* 🚨
+
+Selam *${name}*, ${dayName} günü saat ${timeOnly}'deki maçımızda acil ${pos} eksiğimiz var! ⚽🔥
+Kurtarıcımız olursun! Kadroya girmek için hemen tıkla:
+
+✅ *GELİYORUM (KADROYA GİR):* ${linkYes}
+❌ *GELEMİYORUM:* ${linkNo}
+
+📍 *Saha:* ${currentMatch.venueName}`;
     }
 
-    if (templateType === 'detailed') {
-      return `Selam ${name}, ${fullDate} günü ${currentMatch.time} saatinde halı saha maçımız var. 
-📍 Saha: ${currentMatch.venueName} (${currentMatch.pitchNo})
-💰 Kişi Başı: ${currentMatch.costPerPlayer} ₺
-Kadromuza katılmak ister misin? ⚽`;
-    }
-
-    // Urgent substitute
-    return `Selam ${name}, ${dayName} günü saat ${timeOnly}'deki maçımızda acil ${pos} eksiğimiz var. Bize katılabilir misin? Kurtarıcımız olursun! 🚨⚽
-Saha: ${currentMatch.venueName}`;
-  }, [templateType, activePlayer, dayName, timeOnly, fullDate, currentMatch]);
+    // 4. Short and sweet
+    return `Selam *${name}*, ${dayName} günü saat ${timeOnly}'de maçımız var, gelmek ister misin? ⚽🔥
+Saha: ${currentMatch.venueName}
+Tek tıkla onayla: ${linkYes}`;
+  }, [templateType, activePlayer, dayName, timeOnly, feeText, linkYes, linkNo, linkKadro, currentMatch]);
 
   // Handle active message (custom or generated)
   const messageToSend = customMessage.trim() ? customMessage : generatedText;
@@ -90,20 +144,23 @@ Saha: ${currentMatch.venueName}`;
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4">
+    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-4 sm:p-5 shadow-2xl space-y-3.5 max-h-[88vh] overflow-y-auto my-auto">
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-800">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
               <MessageCircle className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-bold text-white text-sm">WhatsApp Maç Daveti Gönder</h3>
-              <p className="text-[10px] text-slate-400">Tek tıkla kişiye özel davet mesajı</p>
+              <h3 className="font-bold text-white text-sm">WhatsApp Tek Tıkla Katılım Daveti</h3>
+              <p className="text-[10px] text-slate-400">Oyuncuya özel doğrudan yanıt linkli mesaj</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white p-1">
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -121,7 +178,7 @@ Saha: ${currentMatch.venueName}`;
           >
             {players.map(p => (
               <option key={p.id} value={p.id}>
-                {p.name} ({p.primaryPosition} • {Math.round(p.finalScore * 10)} OVR)
+                {p.name} ({p.primaryPosition})
               </option>
             ))}
           </select>
@@ -130,47 +187,34 @@ Saha: ${currentMatch.venueName}`;
         {/* Template Style Selector */}
         <div>
           <label className="text-[11px] font-semibold text-slate-300 block mb-1.5">Mesaj Şablonu:</label>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              onClick={() => {
+                setTemplateType('onestep');
+                setCustomMessage('');
+              }}
+              className={`py-2 px-2 rounded-xl text-center text-xs font-bold transition-all border flex items-center justify-center space-x-1 ${
+                templateType === 'onestep'
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 border-emerald-300 shadow-md'
+                  : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white'
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5" />
+              <span>🚀 1-Tıkla Katılım</span>
+            </button>
+
             <button
               onClick={() => {
                 setTemplateType('oneday');
                 setCustomMessage('');
               }}
-              className={`py-2 px-1 rounded-xl text-center text-xs font-bold transition-all border ${
+              className={`py-2 px-2 rounded-xl text-center text-xs font-bold transition-all border ${
                 templateType === 'oneday'
                   ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md'
                   : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
               }`}
             >
-              ⏰ 1 Gün Kala
-            </button>
-
-            <button
-              onClick={() => {
-                setTemplateType('short');
-                setCustomMessage('');
-              }}
-              className={`py-2 px-1 rounded-xl text-center text-xs font-bold transition-all border ${
-                templateType === 'short'
-                  ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-md'
-                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-              }`}
-            >
-              ⚡ Kısa Davet
-            </button>
-
-            <button
-              onClick={() => {
-                setTemplateType('detailed');
-                setCustomMessage('');
-              }}
-              className={`py-2 px-1 rounded-xl text-center text-xs font-bold transition-all border ${
-                templateType === 'detailed'
-                  ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-md'
-                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-              }`}
-            >
-              📋 Detaylı
+              ⏰ 1 Gün Hatırlatma
             </button>
 
             <button
@@ -178,13 +222,27 @@ Saha: ${currentMatch.venueName}`;
                 setTemplateType('urgent');
                 setCustomMessage('');
               }}
-              className={`py-2 px-1 rounded-xl text-center text-xs font-bold transition-all border ${
+              className={`py-2 px-2 rounded-xl text-center text-xs font-bold transition-all border ${
                 templateType === 'urgent'
                   ? 'bg-rose-500 text-white border-rose-400 shadow-md'
                   : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
               }`}
             >
-              🚨 Acil Eksik
+              🚨 Acil Yedek
+            </button>
+
+            <button
+              onClick={() => {
+                setTemplateType('short');
+                setCustomMessage('');
+              }}
+              className={`py-2 px-2 rounded-xl text-center text-xs font-bold transition-all border ${
+                templateType === 'short'
+                  ? 'bg-blue-500 text-white border-blue-400 shadow-md'
+                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+              }`}
+            >
+              ⚡ Sade / Kısa
             </button>
           </div>
         </div>
@@ -197,10 +255,10 @@ Saha: ${currentMatch.venueName}`;
           </div>
 
           <textarea
-            rows={4}
+            rows={6}
             value={messageToSend}
             onChange={e => setCustomMessage(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 font-sans leading-relaxed select-all resize-none"
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 font-mono leading-relaxed select-all resize-none"
           />
         </div>
 

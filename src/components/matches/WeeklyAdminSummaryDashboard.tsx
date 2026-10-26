@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Users,
   UserCheck,
@@ -14,6 +14,8 @@ import {
   TrendingUp,
   FileCheck,
   Sparkles,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { isPlayerExemptForMatch, calculateMatchFinancials } from '../../utils/permissions';
@@ -27,7 +29,13 @@ interface WeeklyAdminSummaryDashboardProps {
 export const WeeklyAdminSummaryDashboard: React.FC<WeeklyAdminSummaryDashboardProps> = ({
   onNavigateToSquad,
 }) => {
-  const { currentMatch, players, playersMap, toggleSquadLock, isAdmin } = useApp();
+  const { currentMatch, players, playersMap, toggleSquadLock, isAdmin, isCouncil } = useApp();
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // If not admin or council member, do not display internal financial & lock dashboard
+  if (!isCouncil) {
+    return null;
+  }
 
   // 1. Attendance Metrics (Geliyor, Gelemiyor, Haber Bekleniyor)
   const attendanceValues = Object.values(currentMatch.attendance || {});
@@ -69,30 +77,32 @@ export const WeeklyAdminSummaryDashboard: React.FC<WeeklyAdminSummaryDashboardPr
   const isFinalized = lockStatus === 'finalized';
 
   return (
-    <div className="p-4 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900/95 to-slate-950 border border-slate-800 shadow-2xl space-y-4">
+    <div className="p-3.5 sm:p-4 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900/95 to-slate-950 border border-slate-800 shadow-2xl space-y-3 transition-all">
       {/* Header Bar */}
-      <div className="flex items-center justify-between pb-3 border-b border-slate-800/80">
+      <div className="flex items-center justify-between pb-2.5 border-b border-slate-800/80">
         <div className="flex items-center space-x-2.5">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-white shadow-md shadow-emerald-500/20 shrink-0">
             <TrendingUp className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-sm font-black text-white flex items-center space-x-1.5">
+            <h3 className="text-xs sm:text-sm font-black text-white flex items-center space-x-1.5">
               <span>Haftalık Akıllı Yönetici Özeti</span>
               <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                 {currentMatch.matchNumber}. Hafta
               </span>
             </h3>
-            <p className="text-[11px] text-slate-400">
-              Katılım, kalıcı kadro, ödeme muafiyeti ve bildirim durumları
+            <p className="text-[10px] sm:text-[11px] text-slate-400">
+              {isCollapsed
+                ? `${attendingCount} Geliyor • ${emptySlots} Boş • ${financials.totalCollected}/${financials.effectiveTotalDue} ₺ Tahsilat`
+                : 'Katılım, kalıcı kadro, muafiyet ve tahsilat durumları'}
             </p>
           </div>
         </div>
 
-        {/* Squad Lock Status Pill */}
+        {/* Squad Lock Status Pill & Collapse Toggle */}
         <div className="flex items-center space-x-1.5">
           <span
-            className={`text-[10px] font-black px-2.5 py-1 rounded-full border flex items-center space-x-1 ${
+            className={`text-[10px] font-black px-2 py-0.5 rounded-full border flex items-center space-x-1 ${
               isFinalized
                 ? 'bg-rose-500/15 border-rose-500/40 text-rose-300'
                 : 'bg-amber-500/15 border-amber-500/40 text-amber-300'
@@ -101,7 +111,7 @@ export const WeeklyAdminSummaryDashboard: React.FC<WeeklyAdminSummaryDashboardPr
             {isFinalized ? (
               <>
                 <Lock className="w-3 h-3 text-rose-400" />
-                <span>KESİNLEŞTİ</span>
+                <span>KİLİTLİ</span>
               </>
             ) : (
               <>
@@ -124,146 +134,158 @@ export const WeeklyAdminSummaryDashboard: React.FC<WeeklyAdminSummaryDashboardPr
               {isFinalized ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
             </button>
           )}
+
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition-all"
+            title={isCollapsed ? 'Genişlet' : 'Küçült'}
+          >
+            {isCollapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+          </button>
         </div>
       </div>
 
-      {/* 11 METRICS GRID */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-        {/* Metric 1: Geliyorum */}
-        <div className="p-2.5 rounded-2xl bg-emerald-950/30 border border-emerald-800/40 space-y-1">
-          <div className="flex items-center justify-between text-emerald-400">
-            <span className="text-[10px] font-bold uppercase tracking-wider">Geliyorum</span>
-            <UserCheck className="w-3.5 h-3.5" />
-          </div>
-          <div className="text-xl font-black text-white font-mono">{attendingCount}</div>
-          <span className="text-[10px] text-emerald-400/80 block">Onaylanan Katılım</span>
-        </div>
+      {/* 11 METRICS GRID (Collapsible) */}
+      {!isCollapsed && (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+            {/* Metric 1: Geliyorum */}
+            <div className="p-2.5 rounded-2xl bg-emerald-950/30 border border-emerald-800/40 space-y-1">
+              <div className="flex items-center justify-between text-emerald-400">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Geliyorum</span>
+                <UserCheck className="w-3.5 h-3.5" />
+              </div>
+              <div className="text-xl font-black text-white font-mono">{attendingCount}</div>
+              <span className="text-[10px] text-emerald-400/80 block">Onaylanan Katılım</span>
+            </div>
 
-        {/* Metric 2: Gelmiyorum */}
-        <div className="p-2.5 rounded-2xl bg-rose-950/30 border border-rose-800/40 space-y-1">
-          <div className="flex items-center justify-between text-rose-400">
-            <span className="text-[10px] font-bold uppercase tracking-wider">Gelmiyorum</span>
-            <UserX className="w-3.5 h-3.5" />
-          </div>
-          <div className="text-xl font-black text-white font-mono">{declinedCount}</div>
-          <span className="text-[10px] text-rose-400/80 block">Kadro Dışı & Uyarılı</span>
-        </div>
+            {/* Metric 2: Gelmiyorum */}
+            <div className="p-2.5 rounded-2xl bg-rose-950/30 border border-rose-800/40 space-y-1">
+              <div className="flex items-center justify-between text-rose-400">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Gelmiyorum</span>
+                <UserX className="w-3.5 h-3.5" />
+              </div>
+              <div className="text-xl font-black text-white font-mono">{declinedCount}</div>
+              <span className="text-[10px] text-rose-400/80 block">Kadro Dışı & Uyarılı</span>
+            </div>
 
-        {/* Metric 3: Yanıt Vermeyen */}
-        <div className="p-2.5 rounded-2xl bg-amber-950/30 border border-amber-800/40 space-y-1">
-          <div className="flex items-center justify-between text-amber-400">
-            <span className="text-[10px] font-bold uppercase tracking-wider">Bekleyen</span>
-            <Clock className="w-3.5 h-3.5" />
-          </div>
-          <div className="text-xl font-black text-white font-mono">{pendingCount}</div>
-          <span className="text-[10px] text-amber-400/80 block">Yanıt Vermedi</span>
-        </div>
+            {/* Metric 3: Yanıt Vermeyen */}
+            <div className="p-2.5 rounded-2xl bg-amber-950/30 border border-amber-800/40 space-y-1">
+              <div className="flex items-center justify-between text-amber-400">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Bekleyen</span>
+                <Clock className="w-3.5 h-3.5" />
+              </div>
+              <div className="text-xl font-black text-white font-mono">{pendingCount}</div>
+              <span className="text-[10px] text-amber-400/80 block">Yanıt Vermedi</span>
+            </div>
 
-        {/* Metric 4 & 5: Kadro Atanmış */}
-        <div className="p-2.5 rounded-2xl bg-slate-800/50 border border-slate-700/60 space-y-1">
-          <div className="flex items-center justify-between text-slate-300">
-            <span className="text-[10px] font-bold uppercase tracking-wider">Atanan Kadro</span>
-            <Users className="w-3.5 h-3.5 text-blue-400" />
-          </div>
-          <div className="text-xl font-black text-white font-mono">
-            {assignedCount} <span className="text-xs text-slate-400">/ 14</span>
-          </div>
-          <span className="text-[10px] text-slate-400 block">7v7 Dağılım</span>
-        </div>
+            {/* Metric 4 & 5: Kadro Atanmış */}
+            <div className="p-2.5 rounded-2xl bg-slate-800/50 border border-slate-700/60 space-y-1">
+              <div className="flex items-center justify-between text-slate-300">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Atanan Kadro</span>
+                <Users className="w-3.5 h-3.5 text-blue-400" />
+              </div>
+              <div className="text-xl font-black text-white font-mono">
+                {assignedCount} <span className="text-xs text-slate-400">/ 14</span>
+              </div>
+              <span className="text-[10px] text-slate-400 block">7v7 Dağılım</span>
+            </div>
 
-        {/* Metric 6: Boş Kalan Yerler */}
-        <div className="p-2.5 rounded-2xl bg-slate-800/50 border border-slate-700/60 space-y-1">
-          <div className="flex items-center justify-between text-slate-300">
-            <span className="text-[10px] font-bold uppercase tracking-wider">Boş Kontenjan</span>
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-          </div>
-          <div
-            className={`text-xl font-black font-mono ${
-              emptySlots === 0 ? 'text-emerald-400' : 'text-amber-400'
-            }`}
-          >
-            {emptySlots}
-          </div>
-          <span className="text-[10px] text-slate-400 block">
-            {emptySlots === 0 ? 'Kadro Tam' : 'Oyuncu Gerekiyor'}
-          </span>
-        </div>
+            {/* Metric 6: Boş Kalan Yerler */}
+            <div className="p-2.5 rounded-2xl bg-slate-800/50 border border-slate-700/60 space-y-1">
+              <div className="flex items-center justify-between text-slate-300">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Boş Kontenjan</span>
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              </div>
+              <div
+                className={`text-xl font-black font-mono ${
+                  emptySlots === 0 ? 'text-emerald-400' : 'text-amber-400'
+                }`}
+              >
+                {emptySlots}
+              </div>
+              <span className="text-[10px] text-slate-400 block">
+                {emptySlots === 0 ? 'Kadro Tam' : 'Oyuncu Gerekiyor'}
+              </span>
+            </div>
 
-        {/* Metric 7: Muaf Oyuncu */}
-        <div className="p-2.5 rounded-2xl bg-purple-950/30 border border-purple-800/40 space-y-1">
-          <div className="flex items-center justify-between text-purple-400">
-            <span className="text-[10px] font-bold uppercase tracking-wider">Muaf Oyuncu</span>
-            <ShieldCheck className="w-3.5 h-3.5" />
-          </div>
-          <div className="text-xl font-black text-white font-mono">{exemptCount}</div>
-          <span className="text-[10px] text-purple-300/80 block">0 ₺ Yükümlülük</span>
-        </div>
+            {/* Metric 7: Muaf Oyuncu */}
+            <div className="p-2.5 rounded-2xl bg-purple-950/30 border border-purple-800/40 space-y-1">
+              <div className="flex items-center justify-between text-purple-400">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Muaf Oyuncu</span>
+                <ShieldCheck className="w-3.5 h-3.5" />
+              </div>
+              <div className="text-xl font-black text-white font-mono">{exemptCount}</div>
+              <span className="text-[10px] text-purple-300/80 block">0 ₺ Yükümlülük</span>
+            </div>
 
-        {/* Metric 8 & 9: Tahsil Edilen & Hesaplanan */}
-        <div className="p-2.5 rounded-2xl bg-emerald-950/30 border border-emerald-800/40 space-y-1">
-          <div className="flex items-center justify-between text-emerald-400">
-            <span className="text-[10px] font-bold uppercase tracking-wider">Tahsilat</span>
-            <Coins className="w-3.5 h-3.5" />
-          </div>
-          <div className="text-xl font-black text-emerald-400 font-mono">
-            {financials.totalCollected} ₺
-          </div>
-          <span className="text-[10px] text-slate-400 block">
-            Hedef: {financials.effectiveTotalDue} ₺
-          </span>
-        </div>
+            {/* Metric 8 & 9: Tahsil Edilen & Hesaplanan */}
+            <div className="p-2.5 rounded-2xl bg-emerald-950/30 border border-emerald-800/40 space-y-1">
+              <div className="flex items-center justify-between text-emerald-400">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Tahsilat</span>
+                <Coins className="w-3.5 h-3.5" />
+              </div>
+              <div className="text-xl font-black text-emerald-400 font-mono">
+                {financials.totalCollected} ₺
+              </div>
+              <span className="text-[10px] text-slate-400 block">
+                Hedef: {financials.effectiveTotalDue} ₺
+              </span>
+            </div>
 
-        {/* Metric 10: Kalan Tahsilat (Kasa Borcu) */}
-        <div className="p-2.5 rounded-2xl bg-slate-800/50 border border-slate-700/60 space-y-1">
-          <div className="flex items-center justify-between text-slate-300">
-            <span className="text-[10px] font-bold uppercase tracking-wider">Kalan Alacak</span>
-            <CreditCard className="w-3.5 h-3.5 text-rose-400" />
+            {/* Metric 10: Kalan Tahsilat (Kasa Borcu) */}
+            <div className="p-2.5 rounded-2xl bg-slate-800/50 border border-slate-700/60 space-y-1">
+              <div className="flex items-center justify-between text-slate-300">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Kalan Alacak</span>
+                <CreditCard className="w-3.5 h-3.5 text-rose-400" />
+              </div>
+              <div
+                className={`text-xl font-black font-mono ${
+                  financials.remainingDebt > 0 ? 'text-rose-400' : 'text-emerald-400'
+                }`}
+              >
+                {financials.remainingDebt} ₺
+              </div>
+              <span className="text-[10px] text-slate-400 block">
+                {financials.remainingDebt > 0 ? 'Ödeme Bekleniyor' : 'Kasa Kapandı'}
+              </span>
+            </div>
           </div>
-          <div
-            className={`text-xl font-black font-mono ${
-              financials.remainingDebt > 0 ? 'text-rose-400' : 'text-emerald-400'
-            }`}
-          >
-            {financials.remainingDebt} ₺
-          </div>
-          <span className="text-[10px] text-slate-400 block">
-            {financials.remainingDebt > 0 ? 'Ödeme Bekleniyor' : 'Kasa Kapandı'}
-          </span>
-        </div>
-      </div>
 
-      {/* Metric 11 (Failed Dispatches Alert if any) */}
-      {failedDispatchesCount > 0 && (
-        <div className="p-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 flex items-center justify-between text-xs font-semibold">
-          <div className="flex items-center space-x-2">
-            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
-            <span>
-              <strong>{failedDispatchesCount}</strong> başarısız bildirim gönderimi tespit edildi.
+          {/* Metric 11 (Failed Dispatches Alert if any) */}
+          {failedDispatchesCount > 0 && (
+            <div className="p-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 flex items-center justify-between text-xs font-semibold">
+              <div className="flex items-center space-x-2">
+                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>
+                  <strong>{failedDispatchesCount}</strong> başarısız bildirim gönderimi tespit edildi.
+                </span>
+              </div>
+              <span className="text-[10px] underline cursor-pointer" onClick={onNavigateToSquad}>
+                Detaylar
+              </span>
+            </div>
+          )}
+
+          {/* Quick Action Navigation Bar */}
+          <div className="flex items-center justify-between pt-1">
+            <span className="text-[11px] text-slate-400">
+              Kalıcı kadro durumu:{' '}
+              <strong className="text-white">
+                {isFinalized ? 'Kesinleşti (Kilitli)' : 'Taslak (Düzenlenebilir)'}
+              </strong>
             </span>
+
+            <button
+              onClick={onNavigateToSquad}
+              className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 text-xs font-bold transition-all active:scale-95"
+            >
+              <span>Kadroyu Görüntüle & Yönet</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
           </div>
-          <span className="text-[10px] underline cursor-pointer" onClick={onNavigateToSquad}>
-            Detaylar
-          </span>
-        </div>
+        </>
       )}
-
-      {/* Quick Action Navigation Bar */}
-      <div className="flex items-center justify-between pt-1">
-        <span className="text-[11px] text-slate-400">
-          Kalıcı kadro durumu:{' '}
-          <strong className="text-white">
-            {isFinalized ? 'Kesinleşti (Kilitli)' : 'Taslak (Düzenlenebilir)'}
-          </strong>
-        </span>
-
-        <button
-          onClick={onNavigateToSquad}
-          className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 text-xs font-bold transition-all active:scale-95"
-        >
-          <span>Kadroyu Görüntüle & Yönet</span>
-          <ArrowRight className="w-3.5 h-3.5" />
-        </button>
-      </div>
     </div>
   );
 };

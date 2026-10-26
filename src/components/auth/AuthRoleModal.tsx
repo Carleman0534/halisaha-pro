@@ -140,74 +140,80 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4 animate-in zoom-in-95 max-h-[92vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-start sm:items-center justify-center p-2 sm:p-4 overflow-y-auto">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full shadow-2xl flex flex-col max-h-[88vh] overflow-hidden my-auto animate-in zoom-in-95">
+        {/* Pinned Fixed Header - ALWAYS VISIBLE */}
+        <div className="p-3.5 sm:p-4 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-900 z-10">
           <div className="flex items-center space-x-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white">
-              <Shield className="w-5 h-5" />
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white shrink-0">
+              <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-white text-sm">Kullanıcı Girişi & Güvenlik</h3>
+              <h3 className="font-bold text-white text-xs sm:text-sm">Kullanıcı Girişi & Güvenlik</h3>
               <p className="text-[10px] text-slate-400">Yönetici (Konsey) veya Misafir / Oyuncu</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white p-1">
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+            title="Kapat"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Current Active Profile Info */}
-        <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between text-xs">
-          <div className="flex items-center space-x-2">
-            {currentUser.role === 'admin' ? (
-              <Crown className="w-4 h-4 text-amber-400" />
-            ) : currentUser.role === 'council_member' ? (
-              <Shield className="w-4 h-4 text-emerald-400" />
-            ) : currentUser.role === 'player' ? (
-              <User className="w-4 h-4 text-blue-400" />
-            ) : (
-              <User className="w-4 h-4 text-slate-400" />
-            )}
-            <div>
-              <span className="text-[10px] text-slate-400 block">Şu Anki Giriş:</span>
-              <span className="font-bold text-white">{currentUser.name}</span>
+        {/* Scrollable Body */}
+        <div className="p-3.5 sm:p-4 overflow-y-auto flex-1 min-h-0 space-y-3">
+          {/* Current Active Profile Info */}
+          <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between text-xs">
+            <div className="flex items-center space-x-2">
+              {currentUser.role === 'admin' ? (
+                <Crown className="w-4 h-4 text-amber-400" />
+              ) : currentUser.role === 'council_member' ? (
+                <Shield className="w-4 h-4 text-emerald-400" />
+              ) : currentUser.role === 'player' ? (
+                <User className="w-4 h-4 text-blue-400" />
+              ) : (
+                <User className="w-4 h-4 text-slate-400" />
+              )}
+              <div>
+                <span className="text-[10px] text-slate-400 block">Şu Anki Giriş:</span>
+                <span className="font-bold text-white">{currentUser.name}</span>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-full font-black border ${
+                  currentUser.role === 'admin'
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                    : currentUser.role === 'council_member'
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                    : currentUser.role === 'player'
+                    ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                    : 'bg-slate-700/40 text-slate-300 border-slate-600'
+                }`}
+              >
+                {currentUser.role === 'admin'
+                  ? '👑 Yönetici'
+                  : currentUser.role === 'council_member'
+                  ? '🛡️ Konsey Üyesi'
+                  : currentUser.role === 'player'
+                  ? '⚽ Oyuncu'
+                  : '👤 Misafir'}
+              </span>
+
+              {isAdmin && (
+                <button
+                  onClick={handleLogoutToGuest}
+                  title="Yönetici Oturumunu Kapat (Misafir Moduna Geç)"
+                  className="p-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 text-xs transition-all active:scale-95 flex items-center space-x-1"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span className="text-[10px] font-bold">Çıkış</span>
+                </button>
+              )}
             </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <span
-              className={`text-[10px] px-2 py-0.5 rounded-full font-black border ${
-                currentUser.role === 'admin'
-                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                  : currentUser.role === 'council_member'
-                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                  : currentUser.role === 'player'
-                  ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
-                  : 'bg-slate-700/40 text-slate-300 border-slate-600'
-              }`}
-            >
-              {currentUser.role === 'admin'
-                ? '👑 Yönetici'
-                : currentUser.role === 'council_member'
-                ? '🛡️ Konsey Üyesi'
-                : currentUser.role === 'player'
-                ? '⚽ Oyuncu'
-                : '👤 Misafir'}
-            </span>
-
-            {isAdmin && (
-              <button
-                onClick={handleLogoutToGuest}
-                title="Yönetici Oturumunu Kapat (Misafir Moduna Geç)"
-                className="p-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 text-xs transition-all active:scale-95 flex items-center space-x-1"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span className="text-[10px] font-bold">Çıkış</span>
-              </button>
-            )}
-          </div>
-        </div>
 
         {/* ============================================================ */}
         {/* SUB-VIEW 1: PIN PROMPT FOR COUNCIL MEMBER LOGIN              */}
@@ -554,6 +560,7 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({ onClose }) => {
             )}
           </>
         )}
+        </div>
       </div>
     </div>
   );
