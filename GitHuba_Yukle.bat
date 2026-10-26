@@ -11,14 +11,14 @@ echo.
 echo Kodlar GitHub'a gonderiliyor...
 echo.
 
+set "PATH=%LOCALAPPDATA%\Programs\MinGit\cmd;%LOCALAPPDATA%\Programs\GCM;%PATH%"
+
 cd /d "C:\Users\user\Desktop\halisaha-pro-main"
 
-set "GIT_CMD=C:\Users\user\AppData\Local\Programs\MinGit\cmd\git.exe"
-
-"%GIT_CMD%" branch -M main
-"%GIT_CMD%" add .
-"%GIT_CMD%" commit -m "update: halisaha pro sync" >nul 2>&1
-"%GIT_CMD%" push -u origin main --force
+git branch -M main
+git add .
+git commit -m "feat: permanent squad, exemption, council permissions and admin dashboard" >nul 2>&1
+git push -u origin main --force
 
 echo.
 if %ERRORLEVEL% EQU 0 (
@@ -27,15 +27,15 @@ if %ERRORLEVEL% EQU 0 (
     echo   TEBRIKLER! Tum dosyalar GitHub'a basariyla yuklendi!
     echo ========================================================
     echo.
-    echo Siteniz guncellendi.
+    echo Vercel veya Netlify uzerindeki siteniz otomatik guncellendi.
 ) else (
     color 0C
     echo ========================================================
     echo   Bir hata olustu.
     echo ========================================================
     echo.
-    echo Eger GitHub kullanici adi ve sifre/token sorarsa,
-    echo lutfen bilgilerinizi giriniz.
+    echo Eger GitHub tarayici onay ekrani actiysa, lutfen tarayicida
+    echo "Authorize" butonuna tiklayarak izni onaylayiniz.
 )
 echo.
 pause
