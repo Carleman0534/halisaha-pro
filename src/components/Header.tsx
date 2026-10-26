@@ -43,7 +43,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenFirebaseModal }) => {
       : 'Misafir';
 
   return (
-    <header className="sticky top-0 z-30 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3 w-full">
+    <header className="sticky top-0 z-30 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 px-3 sm:px-6 py-2.5 sm:py-3 w-full md:hidden">
       <div className="w-full flex items-center justify-between gap-2 sm:gap-4">
         {/* ============================================================== */}
         {/* SAYFANIN EN SOLUNA SABİTLENMİŞ VE TIKLANDIĞINDA PERDEYİ AÇAN LOGO */}

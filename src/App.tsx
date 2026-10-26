@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AppProvider } from './context/AppContext';
 import { Header } from './components/Header';
+import { Sidebar } from './components/Sidebar';
 import { BottomNav, TabType } from './components/BottomNav';
 import { MatchPlanner } from './components/matches/MatchPlanner';
 import { SquadManager } from './components/squad/SquadManager';
@@ -16,25 +17,34 @@ const MainLayout: React.FC = () => {
   const [showFirebaseModal, setShowFirebaseModal] = useState(false);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-emerald-500 selection:text-white">
-      {/* Top Header - Full Responsive Width */}
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row selection:bg-emerald-500 selection:text-white">
+      {/* 1. VERTICAL LEFT SIDEBAR: Pinned along the left of the page on desktop (Sayfanın solunda dik blok) */}
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onOpenFirebaseModal={() => setShowFirebaseModal(true)}
+      />
+
+      {/* 2. TOP MOBILE HEADER: Shown on mobile screens (< md) */}
       <Header onOpenFirebaseModal={() => setShowFirebaseModal(true)} />
 
-      {/* Main Content Area - Expands gracefully on desktop/tablet while staying 100% responsive on mobile */}
-      <main className="flex-1 w-full max-w-5xl lg:max-w-6xl mx-auto px-3.5 sm:px-6 lg:px-8 pt-4 pb-24">
-        {/* PWA Install Banner */}
-        <PwaInstallPrompt />
+      {/* 3. MAIN CONTENT AREA: Expands gracefully to the right of the vertical sidebar on desktop */}
+      <main className="flex-1 w-full md:pl-64 lg:pl-72 min-h-screen px-3.5 sm:px-6 lg:px-8 pt-4 pb-24 md:pb-8">
+        <div className="w-full max-w-6xl mx-auto">
+          {/* PWA Install Banner */}
+          <PwaInstallPrompt />
 
-        {activeTab === 'matches' && (
-          <MatchPlanner onNavigateToSquad={() => setActiveTab('squad')} />
-        )}
-        {activeTab === 'squad' && <SquadManager />}
-        {activeTab === 'players' && <PlayerPool />}
-        {activeTab === 'finance' && <FinanceManager />}
-        {activeTab === 'rules' && <CouncilRules />}
+          {activeTab === 'matches' && (
+            <MatchPlanner onNavigateToSquad={() => setActiveTab('squad')} />
+          )}
+          {activeTab === 'squad' && <SquadManager />}
+          {activeTab === 'players' && <PlayerPool />}
+          {activeTab === 'finance' && <FinanceManager />}
+          {activeTab === 'rules' && <CouncilRules />}
+        </div>
       </main>
 
-      {/* Bottom 5-Tab Navigation Bar */}
+      {/* 4. BOTTOM MOBILE NAV: Shown on mobile screens (< md), hidden on desktop */}
       <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
 
       {/* Firebase Settings Modal */}
