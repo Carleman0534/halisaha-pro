@@ -3,6 +3,7 @@ import { X, Download, Share2, Sparkles, Check, Shield } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import confetti from 'canvas-confetti';
 import { Player } from '../../types';
+import { useApp } from '../../context/AppContext';
 
 interface FifaCardModalProps {
   player: Player;
@@ -10,6 +11,7 @@ interface FifaCardModalProps {
 }
 
 export const FifaCardModal: React.FC<FifaCardModalProps> = ({ player, onClose }) => {
+  const { currentMatch } = useApp();
   const cardRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
   const [copiedToast, setCopiedToast] = useState(false);
@@ -156,6 +158,11 @@ export const FifaCardModal: React.FC<FifaCardModalProps> = ({ player, onClose })
                 {isJoker && (
                   <span className="absolute -top-1 -right-1 text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-purple-500 text-white shadow-lg border border-purple-300">
                     Joker
+                  </span>
+                )}
+                {player.id === currentMatch.mvpWinnerId && (
+                  <span className="absolute -bottom-1 -left-1 text-[8px] font-black uppercase px-1.5 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-yellow-300 text-black shadow-lg border border-yellow-200 flex items-center space-x-0.5">
+                    <span>⭐ MVP</span>
                   </span>
                 )}
               </div>

@@ -66,6 +66,13 @@ export interface Player {
     recentAttendance: AttendanceStatus[];
   };
   financialBalance: number; // TL (negative means owes money)
+  careerStats?: {
+    goals: number;
+    assists: number;
+    matchesWon: number;
+    matchesPlayed: number;
+    mvpCount: number;
+  };
 }
 
 export interface TeamPlayer {
@@ -84,6 +91,25 @@ export interface Team {
   score?: number;
   formation?: string;
   players: TeamPlayer[];
+}
+
+export interface MatchGoal {
+  id: string;
+  playerId: string;
+  team: 'teamA' | 'teamB';
+  minute?: number;
+  assistPlayerId?: string;
+}
+
+export interface MatchWeather {
+  temperature: number; // e.g. 17 °C
+  condition: string; // e.g. "Parçalı Bulutlu"
+  icon: string; // e.g. "sun", "cloud", "rain"
+  rainProbability: number; // %
+  windSpeed: number; // km/h
+  recommendation: string; // e.g. "Halı saha kramponu ve termal içlik uygundur"
+  city: string;
+  isSimulated?: boolean;
 }
 
 export interface MatchPayment {
@@ -110,8 +136,11 @@ export interface Match {
   teamB: Team;
   attendance: Record<string, AttendanceStatus>;
   payments: Record<string, MatchPayment>;
+  goals?: MatchGoal[];
   mvpVotes?: Record<string, number>; // playerId -> vote count
+  userMvpVotes?: Record<string, string>; // voterId -> candidatePlayerId
   mvpWinnerId?: string;
+  weather?: MatchWeather;
   notes?: string;
 }
 

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Player, Match, Evaluator, AttendanceStatus, Position, AppUser } from '../types';
+import { Player, Match, Evaluator, AttendanceStatus, Position, AppUser, MatchGoal } from '../types';
 import {
   COUNCIL_MEMBERS,
   RAW_PLAYERS_DATA,
@@ -39,7 +39,7 @@ interface AppContextType {
   togglePayment: (playerId: string) => void;
   updateSquad: (newSquadIds: string[]) => void;
   autoBalanceSquad: () => void;
-  setMatchScores: (scoreA: number, scoreB: number) => void;
+  setMatchScores: (scoreA: number, scoreB: number, goals?: MatchGoal[], mvpWinnerId?: string) => void;
   createNewMatch: (date: string, time: string, cost: number, venue: string) => void;
   addPlayer: (
     name: string,
@@ -61,6 +61,8 @@ interface AppContextType {
     addToSquad?: boolean
   ) => void;
   voteMvp: (playerId: string) => void;
+  castMvpVote: (candidatePlayerId: string, voterId: string) => void;
+  finalizeMvp: (winnerPlayerId: string) => void;
   setMatchFormat: (format: '5v5' | '6v6' | '7v7' | '8v8') => void;
   assignPlayerToTeam: (playerId: string, team: 'teamA' | 'teamB' | 'bench', position?: Position) => void;
   updatePlayerPositionInTeam: (playerId: string, team: 'teamA' | 'teamB', newPosition: Position) => void;
@@ -416,12 +418,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Set match scores and complete
-  const setMatchScores = (scoreA: number, scoreB: number) => {
+  const setMatchScores = (scoreA: number, scoreB: number, goals?: MatchGoal[], mvpWinnerId?: string) => {
     const completedMatch: Match = {
       ...currentMatch,
       status: 'completed',
       teamA: { ...currentMatch.teamA, score: scoreA },
       teamB: { ...currentMatch.teamB, score: scoreB },
+      goals: goals !== undefined ? goals : currentMatch.goals,
+      mvpWinnerId: mvpWinnerId !== undefined ? mvpWinnerId : currentMatch.mvpWinnerId,
     };
 
     setCurrentMatch(completedMatch);
@@ -619,6 +623,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  // Cast MVP vote with voter tracking to prevent double voting
+  const castMvpVote = (candidatePlayerId: string, voterId: string) => {
+    setCurrentMatch(prev => {
+      const currentVotes = { ...(prev.mvpVotes || {}) };
+      const currentUserVotes = { ...(prev.userMvpVotes || {}) };
+
+      const prevVoted = currentUserVotes[voterId];
+      if (prevVoted && currentVotes[prevVoted]) {
+        currentVotes[prevVoted] = Math.max(0, currentVotes[prevVoted] - 1);
+      }
+
+      currentVotes[candidatePlayerId] = (currentVotes[candidatePlayerId] || 0) + 1;
+      currentUserVotes[voterId] = candidatePlayerId;
+
+      let maxV = 0;
+      let winnerId = prev.mvpWinnerId;
+      Object.entries(currentVotes).forEach(([pId, vCount]) => {
+        if (vCount > maxV) {
+          maxV = vCount;
+          winnerId = pId;
+        }
+      });
+
+      const nextMatch: Match = {
+        ...prev,
+        mvpVotes: currentVotes,
+        userMvpVotes: currentUserVotes,
+        mvpWinnerId: winnerId,
+      };
+
+      saveMatchToDatabase(nextMatch);
+      return nextMatch;
+    });
+  };
+
+  // Finalize MVP winner
+  const finalizeMvp = (winnerPlayerId: string) => {
+    setCurrentMatch(prev => {
+      const nextMatch: Match = {
+        ...prev,
+        mvpWinnerId: winnerPlayerId,
+      };
+      saveMatchToDatabase(nextMatch);
+      return nextMatch;
+    });
+  };
+
   // Set match format (5v5, 6v6, 7v7, 8v8)
   const setMatchFormat = (format: '5v5' | '6v6' | '7v7' | '8v8') => {
     const targetMap = { '5v5': 10, '6v6': 12, '7v7': 14, '8v8': 16 };
@@ -800,6 +851,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addPlayer,
         batchAddPlayers,
         voteMvp,
+        castMvpVote,
+        finalizeMvp,
         setMatchFormat,
         assignPlayerToTeam,
         updatePlayerPositionInTeam,

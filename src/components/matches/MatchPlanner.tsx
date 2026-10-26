@@ -21,6 +21,7 @@ import { AttendanceStatus } from '../../types';
 import { EmergencySubstituteFinder } from './EmergencySubstituteFinder';
 import { MatchResultsModal } from './MatchResultsModal';
 import { AddToCalendarModal } from '../common/AddToCalendarModal';
+import { MvpVotingModal } from './MvpVotingModal';
 
 interface MatchPlannerProps {
   onNavigateToSquad: () => void;
@@ -384,77 +385,7 @@ export const MatchPlanner: React.FC<MatchPlannerProps> = ({ onNavigateToSquad })
 
       {/* MVP VOTING MODAL */}
       {showMvpModal && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-2xl max-w-sm w-full max-h-[85vh] flex flex-col p-5 shadow-2xl animate-in slide-in-from-bottom">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
-              <div className="flex items-center space-x-2">
-                <Crown className="w-5 h-5 text-amber-400" />
-                <div>
-                  <h3 className="font-bold text-white text-base">Maçın Adamını Seç</h3>
-                  <p className="text-xs text-slate-400">14 kişilik kadrodan oyunuzu verin</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowMvpModal(false)}
-                className="text-slate-400 hover:text-white p-1"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="overflow-y-auto space-y-2 pr-1 flex-1">
-              {currentMatch.squad.map(playerId => {
-                const player = playersMap[playerId];
-                if (!player) return null;
-                const votes = currentMatch.mvpVotes?.[playerId] || 0;
-
-                return (
-                  <button
-                    key={playerId}
-                    onClick={() => {
-                      voteMvp(playerId);
-                      try {
-                        confetti({
-                          particleCount: 40,
-                          spread: 60,
-                          origin: { y: 0.6 },
-                          colors: ['#f59e0b', '#fbbf24', '#10b981'],
-                        });
-                      } catch {}
-                      setShowMvpModal(false);
-                    }}
-                    className="w-full p-3 rounded-xl bg-slate-800/60 hover:bg-amber-500/10 border border-slate-700/60 hover:border-amber-500/40 flex items-center justify-between text-left transition-all active:scale-95 group"
-                  >
-                    <div className="flex items-center space-x-2.5">
-                      <div className="w-8 h-8 rounded-full bg-slate-700 group-hover:bg-amber-500/20 text-slate-200 group-hover:text-amber-400 flex items-center justify-center font-black text-xs">
-                        {player.name.charAt(0)}
-                      </div>
-                      <div>
-                        <span className="font-bold text-sm text-white group-hover:text-amber-300 block">
-                          {player.name}
-                        </span>
-                        <span className="text-[11px] text-slate-400 font-medium">
-                          {player.primaryPosition} • {player.finalScore}p
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-1.5">
-                      {votes > 0 && (
-                        <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-                          {votes} Oy
-                        </span>
-                      )}
-                      <span className="text-xs font-bold text-slate-400 group-hover:text-amber-400">
-                        Seç →
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
+        <MvpVotingModal onClose={() => setShowMvpModal(false)} />
       )}
     </div>
   );

@@ -25,6 +25,8 @@ import {
   Edit3,
   CreditCard,
   AlertTriangle,
+  Trophy,
+  Star,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useApp } from '../../context/AppContext';
@@ -34,6 +36,10 @@ import { AddToCalendarModal } from '../common/AddToCalendarModal';
 import { EditMatchModal } from './EditMatchModal';
 import { PlayerAttendanceConfirmCard } from './PlayerAttendanceConfirmCard';
 import { AuthRoleModal } from '../auth/AuthRoleModal';
+import { WeatherWidget } from '../common/WeatherWidget';
+import { MvpVotingModal } from './MvpVotingModal';
+import { LeaderboardModal } from './LeaderboardModal';
+import { MatchResultsModal } from './MatchResultsModal';
 
 interface EmergencySubstituteFinderProps {
   onNavigateToSquad?: () => void;
@@ -59,8 +65,23 @@ export const EmergencySubstituteFinder: React.FC<EmergencySubstituteFinderProps>
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [showEditMatchModal, setShowEditMatchModal] = useState<'edit' | 'create' | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showMvpModal, setShowMvpModal] = useState(false);
+  const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
+  const [showResultsModal, setShowResultsModal] = useState(false);
   const [copiedBroadcast, setCopiedBroadcast] = useState(false);
   const [selectedPositionFilter, setSelectedPositionFilter] = useState<string>('all');
+
+  // Check if URL opened with ?action=mvp
+  React.useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('action') === 'mvp') {
+          setShowMvpModal(true);
+        }
+      }
+    } catch {}
+  }, []);
 
   // Match target squad count based on format
   const targetCount = currentMatch.targetSquadCount || 14;
@@ -600,7 +621,41 @@ ${gelenlerLines || '(Henüz kadro kesinleşmedi)'}
             </button>
           )}
         </div>
+
+        {/* 2nd Row: Skor, MVP Oylaması, Gol Krallığı */}
+        <div className="grid grid-cols-3 gap-2 mt-2">
+          <button
+            onClick={() => setShowResultsModal(true)}
+            className="flex items-center justify-center space-x-1.5 py-2 px-2 rounded-xl bg-gradient-to-r from-amber-600/30 to-orange-600/30 hover:from-amber-600/40 hover:to-orange-600/40 text-amber-300 border border-amber-500/40 font-bold text-xs transition-all active:scale-95"
+          >
+            <Trophy className="w-3.5 h-3.5 text-amber-400" />
+            <span>Skor & Karne</span>
+          </button>
+
+          <button
+            onClick={() => setShowMvpModal(true)}
+            className="flex items-center justify-center space-x-1.5 py-2 px-2 rounded-xl bg-gradient-to-r from-yellow-600/30 to-amber-600/30 hover:from-yellow-600/40 hover:to-amber-600/40 text-yellow-300 border border-yellow-500/40 font-bold text-xs transition-all active:scale-95"
+          >
+            <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
+            <span>MVP Oyla</span>
+          </button>
+
+          <button
+            onClick={() => setShowLeaderboardModal(true)}
+            className="flex items-center justify-center space-x-1.5 py-2 px-2 rounded-xl bg-gradient-to-r from-emerald-600/30 to-teal-600/30 hover:from-emerald-600/40 hover:to-teal-600/40 text-emerald-300 border border-emerald-500/40 font-bold text-xs transition-all active:scale-95"
+          >
+            <Flame className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Gol Krallığı</span>
+          </button>
+        </div>
       </div>
+
+      {/* 1.5 CANLI MAÇ GÜNÜ HAVA DURUMU WIDGET */}
+      <WeatherWidget
+        matchDate={currentMatch.date}
+        matchTime={currentMatch.time}
+        venueName={currentMatch.venueName}
+      />
 
       {/* 2. 1 GÜN ÖNCE MAÇ TEYİT & BİLDİRİM SİSTEMİ (H-24) */}
       <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-950/40 via-slate-900 to-slate-900 border border-amber-500/30 space-y-3 shadow-lg">
@@ -1241,6 +1296,24 @@ ${gelenlerLines || '(Henüz kadro kesinleşmedi)'}
       {/* 8. AUTH ROLE SWITCH MODAL */}
       {showAuthModal && (
         <AuthRoleModal onClose={() => setShowAuthModal(false)} />
+      )}
+
+      {/* 9. MVP PUBLIC VOTING MODAL */}
+      {showMvpModal && (
+        <MvpVotingModal onClose={() => setShowMvpModal(false)} />
+      )}
+
+      {/* 10. LEADERBOARD & GOL KRALLIĞI MODAL */}
+      {showLeaderboardModal && (
+        <LeaderboardModal onClose={() => setShowLeaderboardModal(false)} />
+      )}
+
+      {/* 11. MATCH RESULTS & SCORERS MODAL */}
+      {showResultsModal && (
+        <MatchResultsModal
+          onClose={() => setShowResultsModal(false)}
+          onOpenMvpVoting={() => setShowMvpModal(true)}
+        />
       )}
     </div>
   );
