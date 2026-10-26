@@ -1,7 +1,9 @@
-import React from 'react';
-import { Shield, Database, Users } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Shield, Database, Users, Bell } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { COUNCIL_MEMBERS } from '../data/initialData';
+import { NotificationModal } from './common/NotificationModal';
+import { getNotificationPermission } from '../services/notifications';
 
 interface HeaderProps {
   onOpenFirebaseModal: () => void;
@@ -9,6 +11,12 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onOpenFirebaseModal }) => {
   const { currentMatch, currentEvaluator, setCurrentEvaluator, firebaseActive } = useApp();
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [hasPermission, setHasPermission] = useState(false);
+
+  useEffect(() => {
+    setHasPermission(getNotificationPermission() === 'granted');
+  }, [showNotificationModal]);
 
   return (
     <header className="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 py-3">
@@ -31,7 +39,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenFirebaseModal }) => {
           </div>
         </div>
 
-        {/* Evaluator Selector & Firebase Status */}
+        {/* Evaluator Selector, Notification Bell & Firebase Status */}
         <div className="flex items-center space-x-2">
           {/* Active Evaluator Badge/Select */}
           <div className="relative flex items-center">
@@ -55,6 +63,18 @@ export const Header: React.FC<HeaderProps> = ({ onOpenFirebaseModal }) => {
             </div>
           </div>
 
+          {/* Notification Bell Button */}
+          <button
+            onClick={() => setShowNotificationModal(true)}
+            title="Sistem Bildirimleri & Hatırlatıcılar"
+            className="relative p-2 rounded-lg border border-slate-700/60 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-all active:scale-95"
+          >
+            <Bell className="w-4 h-4 text-amber-400" />
+            {!hasPermission && (
+              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            )}
+          </button>
+
           {/* Firebase Status Button */}
           <button
             onClick={onOpenFirebaseModal}
@@ -69,6 +89,11 @@ export const Header: React.FC<HeaderProps> = ({ onOpenFirebaseModal }) => {
           </button>
         </div>
       </div>
+
+      {/* Notification Modal */}
+      {showNotificationModal && (
+        <NotificationModal onClose={() => setShowNotificationModal(false)} />
+      )}
     </header>
   );
 };

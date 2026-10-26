@@ -5,6 +5,7 @@ import {
   RAW_PLAYERS_DATA,
   INITIAL_MATCH,
   PAST_MATCHES,
+  CRITERIA_KEYS,
 } from '../data/initialData';
 import {
   buildInitialPlayers,
@@ -38,7 +39,25 @@ interface AppContextType {
   autoBalanceSquad: () => void;
   setMatchScores: (scoreA: number, scoreB: number) => void;
   createNewMatch: (date: string, time: string, cost: number, venue: string) => void;
-  addPlayer: (name: string, pos: Position, secPos?: Position, isJoker?: boolean) => void;
+  addPlayer: (
+    name: string,
+    pos: Position,
+    secPos?: Position,
+    isJoker?: boolean,
+    phone?: string,
+    baselineScore?: number,
+    addToSquad?: boolean
+  ) => void;
+  batchAddPlayers: (
+    playersToAdd: {
+      name: string;
+      pos: Position;
+      phone?: string;
+      baselineScore?: number;
+      isJoker?: boolean;
+    }[],
+    addToSquad?: boolean
+  ) => void;
   voteMvp: (playerId: string) => void;
   setMatchFormat: (format: '5v5' | '6v6' | '7v7' | '8v8') => void;
   assignPlayerToTeam: (playerId: string, team: 'teamA' | 'teamB' | 'bench', position?: Position) => void;
@@ -331,20 +350,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveMatchToDatabase(newM);
   };
 
-  // Add new player to pool
-  const addPlayer = (name: string, pos: Position, secPos?: Position, isJoker: boolean = false) => {
+  // Add new player to pool with smart presets and optional squad enrollment
+  const addPlayer = (
+    name: string,
+    pos: Position,
+    secPos?: Position,
+    isJoker: boolean = false,
+    phone?: string,
+    baselineScore: number = 7.5,
+    addToSquad: boolean = false
+  ) => {
     const newId = `p_custom_${Date.now()}`;
+    const generatedRatings: Record<string, Record<string, number>> = {};
+    COUNCIL_MEMBERS.forEach(m => {
+      generatedRatings[m.id] = {};
+      CRITERIA_KEYS.forEach(c => {
+        const delta = (Math.random() > 0.5 ? 1 : -1) * (Math.random() > 0.6 ? 1 : 0);
+        generatedRatings[m.id][c.key] = Math.max(1, Math.min(10, Math.round(baselineScore + delta)));
+      });
+    });
+
     const newP = recalculatePlayerStats({
       id: newId,
       name,
       primaryPosition: pos,
       secondaryPosition: secPos,
       isJoker,
-      ratings: {},
-      positionScores: { 'Kaleci': 0, 'Defans': 0, 'Orta saha': 0, 'Kanat': 0, 'Forvet': 0 },
-      trimmedMean: 7.0,
+      phone,
+      ratings: generatedRatings,
+      positionScores: { 'Kaleci': baselineScore, 'Defans': baselineScore, 'Orta saha': baselineScore, 'Kanat': baselineScore, 'Forvet': baselineScore },
+      trimmedMean: baselineScore,
       standardDeviation: 0.2,
-      finalScore: 6.9,
+      finalScore: Number((baselineScore - 0.1).toFixed(1)),
       attendanceStats: {
         totalMatches: 0,
         attended: 0,
@@ -363,6 +400,76 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       savePlayerToDatabase(newP);
       return next;
     });
+
+    if (addToSquad) {
+      updateAttendance(newId, 'Geliyor');
+    }
+  };
+
+  // Batch add multiple players at once (e.g. from WhatsApp text list)
+  const batchAddPlayers = (
+    playersToAdd: {
+      name: string;
+      pos: Position;
+      phone?: string;
+      baselineScore?: number;
+      isJoker?: boolean;
+    }[],
+    addToSquad: boolean = false
+  ) => {
+    const newPlayers: Player[] = [];
+    const newIds: string[] = [];
+
+    playersToAdd.forEach((pData, idx) => {
+      const newId = `p_custom_${Date.now()}_${idx}`;
+      const base = pData.baselineScore || 7.5;
+      const generatedRatings: Record<string, Record<string, number>> = {};
+      COUNCIL_MEMBERS.forEach(m => {
+        generatedRatings[m.id] = {};
+        CRITERIA_KEYS.forEach(c => {
+          const delta = (Math.random() > 0.5 ? 1 : -1) * (Math.random() > 0.6 ? 1 : 0);
+          generatedRatings[m.id][c.key] = Math.max(1, Math.min(10, Math.round(base + delta)));
+        });
+      });
+
+      const newP = recalculatePlayerStats({
+        id: newId,
+        name: pData.name,
+        primaryPosition: pData.pos,
+        secondaryPosition: undefined,
+        isJoker: pData.isJoker || false,
+        phone: pData.phone,
+        ratings: generatedRatings,
+        positionScores: { 'Kaleci': base, 'Defans': base, 'Orta saha': base, 'Kanat': base, 'Forvet': base },
+        trimmedMean: base,
+        standardDeviation: 0.2,
+        finalScore: Number((base - 0.1).toFixed(1)),
+        attendanceStats: {
+          totalMatches: 0,
+          attended: 0,
+          lastMinuteCancel: 0,
+          noShow: 0,
+          penaltyPoints: 0,
+          isSuspended: false,
+          recentAttendance: [],
+        },
+        financialBalance: 0,
+      });
+
+      newPlayers.push(newP);
+      newIds.push(newId);
+    });
+
+    setPlayers(prev => {
+      const next = [...prev, ...newPlayers];
+      saveLocalPlayers(next);
+      newPlayers.forEach(p => savePlayerToDatabase(p));
+      return next;
+    });
+
+    if (addToSquad) {
+      newIds.forEach(id => updateAttendance(id, 'Geliyor'));
+    }
   };
 
   // Vote for MVP
@@ -511,6 +618,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setMatchScores,
         createNewMatch,
         addPlayer,
+        batchAddPlayers,
         voteMvp,
         setMatchFormat,
         assignPlayerToTeam,

@@ -18,9 +18,10 @@ import { PlayerDetailModal } from './PlayerDetailModal';
 import { EvaluatorModal } from './EvaluatorModal';
 import { FifaCardModal } from './FifaCardModal';
 import { WhatsAppInviteModal } from '../common/WhatsAppInviteModal';
+import { QuickAddPlayerModal } from './QuickAddPlayerModal';
 
 export const PlayerPool: React.FC = () => {
-  const { players, addPlayer } = useApp();
+  const { players } = useApp();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPosition, setSelectedPosition] = useState<string>('ALL');
@@ -30,12 +31,6 @@ export const PlayerPool: React.FC = () => {
   const [fifaCardPlayer, setFifaCardPlayer] = useState<Player | null>(null);
   const [invitePlayer, setInvitePlayer] = useState<Player | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
-
-  // New Player Form State
-  const [newName, setNewName] = useState('');
-  const [newPos, setNewPos] = useState<Position>('Orta saha');
-  const [newSecPos, setNewSecPos] = useState<Position | ''>('');
-  const [newIsJoker, setNewIsJoker] = useState(false);
 
   // Filter players
   const filteredPlayers = players.filter(p => {
@@ -47,15 +42,6 @@ export const PlayerPool: React.FC = () => {
     if (selectedPosition === 'SUSPENDED') return p.attendanceStats.isSuspended;
     return p.primaryPosition === selectedPosition;
   });
-
-  const handleAddNewPlayer = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newName.trim()) return;
-
-    addPlayer(newName.trim(), newPos, newSecPos ? (newSecPos as Position) : undefined, newIsJoker);
-    setNewName('');
-    setShowAddModal(false);
-  };
 
   const positionFilterButtons = [
     { id: 'ALL', label: 'Tümü' },
@@ -246,95 +232,9 @@ export const PlayerPool: React.FC = () => {
         />
       )}
 
-      {/* ADD PLAYER MODAL */}
+      {/* QUICK & BATCH ADD PLAYER MODAL */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <form
-            onSubmit={handleAddNewPlayer}
-            className="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4"
-          >
-            <div>
-              <h3 className="font-bold text-white text-base">Yeni Oyuncu Ekle</h3>
-              <p className="text-xs text-slate-400">Havuz kadrosuna yeni bir oyuncu tanımlayın</p>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">Oyuncu Adı</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Örn: Burak Hoca"
-                  value={newName}
-                  onChange={e => setNewName(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">Asıl Mevki</label>
-                <select
-                  value={newPos}
-                  onChange={e => setNewPos(e.target.value as Position)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
-                >
-                  <option value="Kaleci">Kaleci</option>
-                  <option value="Defans">Defans</option>
-                  <option value="Orta saha">Orta saha</option>
-                  <option value="Kanat">Kanat</option>
-                  <option value="Forvet">Forvet</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">
-                  İkincil Mevki (Opsiyonel)
-                </label>
-                <select
-                  value={newSecPos}
-                  onChange={e => setNewSecPos(e.target.value as Position | '')}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
-                >
-                  <option value="">Yok</option>
-                  <option value="Kaleci">Kaleci</option>
-                  <option value="Defans">Defans</option>
-                  <option value="Orta saha">Orta saha</option>
-                  <option value="Kanat">Kanat</option>
-                  <option value="Forvet">Forvet</option>
-                </select>
-              </div>
-
-              <div className="flex items-center space-x-2 pt-1">
-                <input
-                  type="checkbox"
-                  id="jokerCheck"
-                  checked={newIsJoker}
-                  onChange={e => setNewIsJoker(e.target.checked)}
-                  className="w-4 h-4 accent-emerald-500 rounded"
-                />
-                <label htmlFor="jokerCheck" className="text-xs text-slate-300 font-semibold cursor-pointer">
-                  'Joker' Oyuncu Etiketi Ver
-                </label>
-              </div>
-            </div>
-
-            <div className="flex space-x-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowAddModal(false)}
-                className="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold text-xs"
-              >
-                İptal
-              </button>
-              <button
-                type="submit"
-                className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs"
-              >
-                Kaydet
-              </button>
-            </div>
-          </form>
-        </div>
+        <QuickAddPlayerModal onClose={() => setShowAddModal(false)} />
       )}
     </div>
   );
