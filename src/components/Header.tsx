@@ -44,24 +44,37 @@ export const Header: React.FC<HeaderProps> = ({ onOpenFirebaseModal }) => {
 
   return (
     <header className="sticky top-0 z-30 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3 w-full">
-      <div className="w-full max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
-        {/* Logo & Match Week */}
-        <div className="flex items-center space-x-2.5 sm:space-x-3 shrink-0">
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-green-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
-            <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+      <div className="w-full flex items-center justify-between gap-2 sm:gap-4">
+        {/* ============================================================== */}
+        {/* SAYFANIN EN SOLUNA SABİTLENMİŞ VE TIKLANDIĞINDA PERDEYİ AÇAN LOGO */}
+        {/* ============================================================== */}
+        <button
+          type="button"
+          onClick={() => handleOpenAuth(isCouncil ? 'admin' : 'guest')}
+          title="Tüm Sayfaya Kontrol Perdesini Aç (Rol & Kullanıcı Değiştir)"
+          className="flex items-center space-x-2.5 sm:space-x-3.5 shrink-0 text-left p-1.5 -ml-1.5 rounded-2xl hover:bg-slate-800/80 transition-all cursor-pointer group active:scale-[0.98] select-none"
+        >
+          <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-emerald-600 to-green-400 flex items-center justify-center shadow-lg shadow-emerald-500/25 shrink-0 group-hover:scale-105 group-hover:shadow-emerald-500/40 transition-all">
+            <Shield className="w-5 h-5 text-white" />
           </div>
           <div>
             <div className="flex items-center space-x-1.5 sm:space-x-2">
-              <span className="font-black tracking-tight text-white text-sm sm:text-lg">HALISAHA</span>
+              <span className="font-black tracking-tight text-white text-sm sm:text-lg group-hover:text-emerald-400 transition-colors">
+                HALISAHA
+              </span>
               <span className="text-[10px] sm:text-xs font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                 PRO
               </span>
+              <ChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 group-hover:text-emerald-400 transition-colors group-hover:translate-y-0.5" />
             </div>
-            <p className="text-[10px] sm:text-xs text-slate-400 font-medium truncate max-w-[130px] sm:max-w-none">
-              {currentMatch.matchNumber}. Hafta • {roleLabel} Modu
+            <p className="text-[10px] sm:text-xs text-slate-400 font-medium truncate max-w-[140px] sm:max-w-none flex items-center space-x-1.5">
+              <span>{currentMatch.matchNumber}. Hafta • {roleLabel} Modu</span>
+              <span className="text-[9px] text-emerald-400/90 font-bold bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20 hidden md:inline">
+                Açmak İçin Tıklayın ▾
+              </span>
             </p>
           </div>
-        </div>
+        </button>
 
         {/* User Role Switcher, Direct Logout, Notification Bell & Firebase Status */}
         <div className="flex items-center space-x-1.5 sm:space-x-2.5 shrink-0">
@@ -73,7 +86,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenFirebaseModal }) => {
               {/* Active Profile Pill (Click to switch / open drawer) */}
               <button
                 onClick={() => handleOpenAuth(isCouncil ? 'admin' : 'guest')}
-                title="Kişi veya Rolü Değiştir (Bildirim Perdesi)"
+                title="Kişi veya Rolü Değiştir (Tüm Sayfa Bildirim Perdesi)"
                 className={`flex items-center space-x-1.5 sm:space-x-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl border text-xs sm:text-sm font-bold transition-all active:scale-95 shadow-sm shrink-0 ${
                   currentUser.role === 'admin'
                     ? 'bg-gradient-to-r from-amber-950/80 to-slate-900 border-amber-500/50 text-amber-300 hover:border-amber-400'
