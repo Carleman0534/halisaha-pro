@@ -144,15 +144,16 @@ export const EditMatchModal: React.FC<EditMatchModalProps> = ({
         targetSquadCount: targetCount,
       });
     } else {
-      createNewMatch(finalDate, finalTime, finalCost, finalVenue, finalLocation, finalMapsUrl, finalVenueId);
-      updateMatchDetails({
-        venueId: finalVenueId,
-        venueLocation: finalLocation,
-        venueMapsUrl: finalMapsUrl,
-        matchFormat: format,
-        targetSquadCount: targetCount,
-        costPerPlayer: finalCostPerPlayer,
-      });
+      createNewMatch(
+        finalDate,
+        finalTime,
+        finalCost,
+        finalVenue,
+        finalLocation,
+        finalMapsUrl,
+        finalVenueId,
+        format
+      );
     }
 
     setSaveSuccess(true);

@@ -374,7 +374,16 @@ ${
   const getConfirmUrl = (playerId: string) => {
     try {
       const origin = window.location.origin + window.location.pathname;
-      return `${origin}?oyuncu=${playerId}`;
+      const params = new URLSearchParams({
+        oyuncu: playerId,
+        mDate: currentMatch.date,
+        mTime: currentMatch.time,
+        mVenue: currentMatch.venueName,
+        mLoc: currentMatch.venueLocation || currentMatch.venueName,
+        mCost: String(currentMatch.costPerPlayer),
+        mNo: String(currentMatch.matchNumber),
+      });
+      return `${origin}?${params.toString()}`;
     } catch {
       return '';
     }

@@ -51,6 +51,9 @@ import {
   saveVenueToDatabase,
   buildGoogleMapsUrl,
   subscribeToMatchUpdates,
+  fetchLatestMatchFromCloudSync,
+  getLocalMatchTimestamp,
+  setLocalMatchTimestamp,
 } from '../services/firebase';
 import { sendSystemNotification } from '../services/notifications';
 import { isPlayerExemptForMatch } from '../utils/permissions';
@@ -120,7 +123,8 @@ interface AppContextType {
     venue: string,
     venueLocation?: string,
     venueMapsUrl?: string,
-    venueId?: string
+    venueId?: string,
+    matchFormat?: '5v5' | '6v6' | '7v7' | '8v8'
   ) => void;
   addPlayer: (
     name: string,
@@ -212,10 +216,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (
       !local ||
       !local.squad ||
-      local.squad.length === 0 ||
+      !local.squad.length ||
       local.squad.some(id => id === 'p_hadi' || id === 'p_sukru')
     ) {
-      saveMatchToDatabase(INITIAL_MATCH);
+      saveMatchToDatabase(INITIAL_MATCH, true, false);
       return INITIAL_MATCH;
     }
     return local;
@@ -351,6 +355,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCurrentUser(user);
     try {
       localStorage.setItem('halisaha_current_user', JSON.stringify(user));
+      // Ensure active match is always consistent across user switches
+      const latestMatch = getLocalCurrentMatch(currentMatch);
+      if (latestMatch && latestMatch.id) {
+        setCurrentMatch(latestMatch);
+      }
+      fetchLatestMatchFromCloudSync().then(cloudData => {
+        if (cloudData && cloudData.match && cloudData.ts >= getLocalMatchTimestamp()) {
+          setLocalMatchTimestamp(cloudData.ts);
+          saveMatchToDatabase(cloudData.match, true, false);
+          setCurrentMatch(cloudData.match);
+        }
+      });
     } catch {}
 
     if (user.evaluatorId) {
@@ -733,7 +749,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setPastMatches(prev => prev.map(m => (m.id === matchId ? nextMatch : m)));
       }
 
-      saveMatchToDatabase(nextMatch);
+      saveMatchToDatabase(nextMatch, isCurrent);
       return { success: true };
     } catch (err) {
       console.error('saveSquadForMatch error:', err);
@@ -895,7 +911,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         adminDeclineAlerts: updatedAlerts,
       };
 
-      saveMatchToDatabase(nextMatch);
+      saveMatchToDatabase(nextMatch, isCurrent);
       return nextMatch;
     };
 
@@ -1027,7 +1043,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         notificationLogs: [dispatchLog, ...(prev.notificationLogs || []).slice(0, 20)],
       };
 
-      saveMatchToDatabase(nextMatch);
+      saveMatchToDatabase(nextMatch, true);
       return nextMatch;
     });
 
@@ -1280,7 +1296,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     venue: string,
     venueLocation?: string,
     venueMapsUrl?: string,
-    venueId?: string
+    venueId?: string,
+    matchFormat: '5v5' | '6v6' | '7v7' | '8v8' = '7v7'
   ) => {
     setPastMatches(prev => {
       const next = [currentMatch, ...prev.filter(m => m.id !== currentMatch.id)];
@@ -1289,7 +1306,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     const nextNumber = currentMatch.matchNumber + 1;
-    const defaultSquad = players.slice(0, 14).map(p => p.id);
+    const targetCount =
+      matchFormat === '5v5' ? 10 : matchFormat === '6v6' ? 12 : matchFormat === '8v8' ? 16 : 14;
+    const defaultSquad = players.slice(0, targetCount).map(p => p.id);
     const balanced = balanceTeams(defaultSquad, playersMap);
 
     const newM: Match = {
@@ -1303,7 +1322,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       venueMapsUrl: venueMapsUrl || buildGoogleMapsUrl(venue, venueLocation),
       pitchNo: 'Saha 1',
       totalPitchCost: cost,
-      costPerPlayer: Math.round(cost / 14),
+      costPerPlayer: Math.round(cost / targetCount),
+      matchFormat,
+      targetSquadCount: targetCount,
       status: 'teams_formed',
       squad: defaultSquad,
       teamA: balanced.teamA,
@@ -1327,7 +1348,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setCurrentMatch(newM);
-    saveMatchToDatabase(newM);
+    saveMatchToDatabase(newM, true);
   };
 
   const addPlayer = (
@@ -1488,7 +1509,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         mvpWinnerId: winnerId,
       };
 
-      saveMatchToDatabase(nextMatch);
+      saveMatchToDatabase(nextMatch, true);
       return nextMatch;
     });
   };
@@ -1522,7 +1543,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         mvpWinnerId: winnerId,
       };
 
-      saveMatchToDatabase(nextMatch);
+      saveMatchToDatabase(nextMatch, true);
       return nextMatch;
     });
   };
@@ -1533,7 +1554,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...prev,
         mvpWinnerId: winnerPlayerId,
       };
-      saveMatchToDatabase(nextMatch);
+      saveMatchToDatabase(nextMatch, true);
       return nextMatch;
     });
   };
@@ -1744,7 +1765,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         nextMatch.costPerPlayer = Math.round(nextMatch.totalPitchCost / (target || 14));
       }
 
-      saveMatchToDatabase(nextMatch);
+      saveMatchToDatabase(nextMatch, isCurrent);
       return nextMatch;
     };
 

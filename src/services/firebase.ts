@@ -1,10 +1,8 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import {
   getFirestore,
-  collection,
   doc,
   setDoc,
-  getDocs,
   onSnapshot,
   Firestore,
 } from 'firebase/firestore';
@@ -13,14 +11,131 @@ import { FirebaseConfig, Player, Match, Transaction, ExemptionAuditLog, Notifica
 const STORAGE_KEY_CONFIG = 'halisaha_firebase_config';
 const STORAGE_KEY_PLAYERS = 'halisaha_local_players';
 const STORAGE_KEY_MATCH = 'halisaha_local_current_match';
+const STORAGE_KEY_MATCH_TS = 'halisaha_local_current_match_ts';
 const STORAGE_KEY_PAST_MATCHES = 'halisaha_local_past_matches';
 const STORAGE_KEY_TRANSACTIONS = 'halisaha_local_transactions';
 const STORAGE_KEY_EXEMPTION_LOGS = 'halisaha_local_exemption_audit_logs';
 const STORAGE_KEY_NOTIFICATION_LOGS = 'halisaha_local_notification_dispatch_logs';
 const STORAGE_KEY_VENUES = 'halisaha_local_venues';
 
+// Zero-config realtime cloud sync channel (ensures all accounts/devices see the exact same match & venues)
+const CLOUD_SYNC_TOPIC = 'halisaha_pro_carleman0534_live_v1';
+const CLOUD_SYNC_URL = `https://ntfy.sh/${CLOUD_SYNC_TOPIC}`;
+const CLIENT_INSTANCE_ID = `cli_${Math.random().toString(36).slice(2, 10)}`;
+
 let firestoreInstance: Firestore | null = null;
 let appInstance: FirebaseApp | null = null;
+
+export function getLocalMatchTimestamp(): number {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_MATCH_TS);
+    return raw ? Number(raw) || 0 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function setLocalMatchTimestamp(ts: number): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_MATCH_TS, String(ts));
+  } catch {}
+}
+
+// Create a compact version of Match (< 3KB) for instant cloud pub/sub sync
+function buildCompactMatchForCloud(match: Match): Match {
+  const compactPayments: Match['payments'] = {};
+  Object.entries(match.payments || {}).forEach(([k, v]) => {
+    compactPayments[k] = {
+      isPaid: v.isPaid,
+      amount: v.amount,
+      ...(v.isExempt ? { isExempt: true } : {}),
+    };
+  });
+
+  return {
+    id: match.id,
+    matchNumber: match.matchNumber,
+    date: match.date,
+    time: match.time,
+    venueId: match.venueId,
+    venueName: match.venueName,
+    venueLocation: match.venueLocation,
+    venueMapsUrl: match.venueMapsUrl,
+    pitchNo: match.pitchNo || 'Saha 1',
+    totalPitchCost: match.totalPitchCost,
+    costPerPlayer: match.costPerPlayer,
+    matchFormat: match.matchFormat || '7v7',
+    targetSquadCount: match.targetSquadCount || 14,
+    status: match.status,
+    squad: match.squad || [],
+    teamA: match.teamA,
+    teamB: match.teamB,
+    attendance: match.attendance || {},
+    attendanceTimestamps: match.attendanceTimestamps || {},
+    attendanceRequests: match.attendanceRequests || {},
+    payments: compactPayments,
+    squadLockStatus: match.squadLockStatus || 'draft',
+    mvpWinnerId: match.mvpWinnerId,
+    mvpVotes: match.mvpVotes,
+    userMvpVotes: match.userMvpVotes,
+    notes: match.notes,
+  };
+}
+
+export async function pushMatchToCloudSync(match: Match, ts: number): Promise<void> {
+  try {
+    const payload = JSON.stringify({
+      t: 'match_sync',
+      ts,
+      sid: CLIENT_INSTANCE_ID,
+      match: buildCompactMatchForCloud(match),
+    });
+
+    await fetch(CLOUD_SYNC_URL, {
+      method: 'POST',
+      body: payload,
+      headers: {
+        'Content-Type': 'text/plain;charset=UTF-8',
+        Title: 'HalisahaProSync',
+      },
+    });
+  } catch {
+    // Offline or blocked; local storage still works seamlessly
+  }
+}
+
+export async function fetchLatestMatchFromCloudSync(): Promise<{ match: Match; ts: number } | null> {
+  try {
+    const res = await fetch(`${CLOUD_SYNC_URL}/json?poll=1&since=all`, {
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const text = await res.text();
+    if (!text.trim()) return null;
+
+    const lines = text.trim().split('\n');
+    let latest: { match: Match; ts: number } | null = null;
+
+    for (const line of lines) {
+      try {
+        const envelope = JSON.parse(line);
+        if (envelope && envelope.event === 'message' && typeof envelope.message === 'string') {
+          const parsed = JSON.parse(envelope.message);
+          if (parsed && parsed.t === 'match_sync' && parsed.match && parsed.match.id) {
+            const msgTs = Number(parsed.ts) || (envelope.time ? envelope.time * 1000 : 0);
+            if (!latest || msgTs >= latest.ts) {
+              latest = { match: parsed.match as Match, ts: msgTs };
+            }
+          }
+        }
+      } catch {}
+    }
+
+    return latest;
+  } catch {
+    return null;
+  }
+}
 
 export function loadSavedFirebaseConfig(): FirebaseConfig | null {
   try {
@@ -89,21 +204,32 @@ export async function savePlayerToDatabase(player: Player): Promise<void> {
   }
 }
 
-export async function saveMatchToDatabase(match: Match): Promise<void> {
-  // 1. Determine if current or past match and update local storage
-  const currentMatchRaw = localStorage.getItem(STORAGE_KEY_MATCH);
-  let isCurrent = true;
-  if (currentMatchRaw) {
-    try {
-      const parsedCurrent = JSON.parse(currentMatchRaw);
-      if (parsedCurrent.id && parsedCurrent.id !== match.id) {
-        isCurrent = false;
-      }
-    } catch {}
-  }
+export async function saveMatchToDatabase(
+  match: Match,
+  isCurrentMatch: boolean = true,
+  broadcastToCloud: boolean = true
+): Promise<void> {
+  const nowTs = Date.now();
 
-  if (isCurrent) {
+  // 1. Always save current match directly to STORAGE_KEY_MATCH (even when match.id changes via createNewMatch!)
+  if (isCurrentMatch) {
     localStorage.setItem(STORAGE_KEY_MATCH, JSON.stringify(match));
+    if (broadcastToCloud) {
+      setLocalMatchTimestamp(nowTs);
+    }
+  } else {
+    const currentMatchRaw = localStorage.getItem(STORAGE_KEY_MATCH);
+    if (currentMatchRaw) {
+      try {
+        const parsedCurrent = JSON.parse(currentMatchRaw);
+        if (parsedCurrent.id === match.id) {
+          localStorage.setItem(STORAGE_KEY_MATCH, JSON.stringify(match));
+          if (broadcastToCloud) {
+            setLocalMatchTimestamp(nowTs);
+          }
+        }
+      } catch {}
+    }
   }
 
   // Also keep in past matches if present there
@@ -114,11 +240,21 @@ export async function saveMatchToDatabase(match: Match): Promise<void> {
     saveLocalPastMatches(pastMatches);
   }
 
-  // 2. Write to Firestore if connected
+  // 2. Broadcast to zero-config cloud sync so all devices/accounts immediately stay in sync
+  if (isCurrentMatch && broadcastToCloud) {
+    pushMatchToCloudSync(match, nowTs);
+  }
+
+  // 3. Write to Firestore if connected
   if (firestoreInstance) {
     try {
       const matchRef = doc(firestoreInstance, 'matches', match.id);
       await setDoc(matchRef, match, { merge: true });
+
+      if (isCurrentMatch) {
+        const activeRef = doc(firestoreInstance, 'matches', 'current_active_match');
+        await setDoc(activeRef, match);
+      }
     } catch (err) {
       console.warn('Firestore match write failed, cached locally:', err);
     }
@@ -130,33 +266,116 @@ export function subscribeToMatchUpdates(
   onUpdate: (match: Match) => void
 ): () => void {
   let unsubscribeFirestore: (() => void) | null = null;
+  let unsubscribeActiveMatch: (() => void) | null = null;
+  let eventSource: EventSource | null = null;
+  let isActive = true;
 
-  if (firestoreInstance && matchId) {
+  // 1. Initial Cloud Sync check on mount / user switch
+  fetchLatestMatchFromCloudSync().then(cloudData => {
+    if (!isActive) return;
+    const localTs = getLocalMatchTimestamp();
+
+    if (cloudData && cloudData.match && cloudData.ts > localTs) {
+      localStorage.setItem(STORAGE_KEY_MATCH, JSON.stringify(cloudData.match));
+      setLocalMatchTimestamp(cloudData.ts);
+      onUpdate(cloudData.match);
+    } else {
+      // If local browser has a customized match (e.g. 30 Ekim) that isn't on cloud yet, push it to cloud!
+      try {
+        const rawLocal = localStorage.getItem(STORAGE_KEY_MATCH);
+        if (rawLocal) {
+          const parsedLocal = JSON.parse(rawLocal) as Match;
+          const isCustomized =
+            parsedLocal.date !== '2026-10-28' ||
+            parsedLocal.id !== 'match_current' ||
+            localTs > (cloudData?.ts || 0);
+          if (isCustomized && (!cloudData || localTs > cloudData.ts)) {
+            const pushTs = localTs > 0 ? localTs : Date.now();
+            setLocalMatchTimestamp(pushTs);
+            pushMatchToCloudSync(parsedLocal, pushTs);
+          }
+        }
+      } catch {}
+    }
+  });
+
+  // 2. Live Server-Sent Events (SSE) subscription for real-time cross-device updates
+  if (typeof window !== 'undefined' && typeof EventSource !== 'undefined') {
     try {
-      const matchRef = doc(firestoreInstance, 'matches', matchId);
-      unsubscribeFirestore = onSnapshot(
-        matchRef,
+      eventSource = new EventSource(`${CLOUD_SYNC_URL}/sse`);
+      eventSource.onmessage = event => {
+        if (!isActive || !event.data) return;
+        try {
+          const envelope = JSON.parse(event.data);
+          if (envelope && typeof envelope.message === 'string') {
+            const parsed = JSON.parse(envelope.message);
+            if (
+              parsed &&
+              parsed.t === 'match_sync' &&
+              parsed.sid !== CLIENT_INSTANCE_ID &&
+              parsed.match &&
+              parsed.match.id
+            ) {
+              const incomingTs = Number(parsed.ts) || Date.now();
+              if (incomingTs >= getLocalMatchTimestamp()) {
+                localStorage.setItem(STORAGE_KEY_MATCH, JSON.stringify(parsed.match));
+                setLocalMatchTimestamp(incomingTs);
+                onUpdate(parsed.match as Match);
+              }
+            }
+          }
+        } catch {}
+      };
+    } catch {}
+  }
+
+  // 3. Firestore realtime subscription (if configured)
+  if (firestoreInstance) {
+    try {
+      const activeRef = doc(firestoreInstance, 'matches', 'current_active_match');
+      unsubscribeActiveMatch = onSnapshot(
+        activeRef,
         snapshot => {
           if (snapshot.exists()) {
             const remoteMatch = snapshot.data() as Match;
-            localStorage.setItem(STORAGE_KEY_MATCH, JSON.stringify(remoteMatch));
-            onUpdate(remoteMatch);
+            if (remoteMatch && remoteMatch.id) {
+              localStorage.setItem(STORAGE_KEY_MATCH, JSON.stringify(remoteMatch));
+              onUpdate(remoteMatch);
+            }
           }
         },
         err => {
-          console.warn('Firestore match subscription error:', err);
+          console.warn('Firestore active match subscription error:', err);
         }
       );
+
+      if (matchId) {
+        const matchRef = doc(firestoreInstance, 'matches', matchId);
+        unsubscribeFirestore = onSnapshot(
+          matchRef,
+          snapshot => {
+            if (snapshot.exists()) {
+              const remoteMatch = snapshot.data() as Match;
+              localStorage.setItem(STORAGE_KEY_MATCH, JSON.stringify(remoteMatch));
+              onUpdate(remoteMatch);
+            }
+          },
+          err => {
+            console.warn('Firestore match subscription error:', err);
+          }
+        );
+      }
     } catch (err) {
       console.warn('Failed to subscribe to Firestore match:', err);
     }
   }
 
+  // 4. Cross-tab & cross-account localStorage sync
   const handleStorageEvent = (e: StorageEvent) => {
     if (e.key === STORAGE_KEY_MATCH && e.newValue) {
       try {
         const parsed = JSON.parse(e.newValue) as Match;
-        if (parsed && parsed.id === matchId) {
+        if (parsed && parsed.id) {
           onUpdate(parsed);
         }
       } catch {}
@@ -168,6 +387,13 @@ export function subscribeToMatchUpdates(
   }
 
   return () => {
+    isActive = false;
+    if (eventSource) {
+      try {
+        eventSource.close();
+      } catch {}
+    }
+    if (unsubscribeActiveMatch) unsubscribeActiveMatch();
     if (unsubscribeFirestore) unsubscribeFirestore();
     if (typeof window !== 'undefined') {
       window.removeEventListener('storage', handleStorageEvent);
@@ -192,7 +418,9 @@ export function saveLocalPlayers(players: Player[]): void {
 export function getLocalCurrentMatch(defaultMatch: Match): Match {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_MATCH);
-    return raw ? JSON.parse(raw) : defaultMatch;
+    if (!raw) return defaultMatch;
+    const parsed = JSON.parse(raw) as Match;
+    return parsed && parsed.id ? parsed : defaultMatch;
   } catch {
     return defaultMatch;
   }

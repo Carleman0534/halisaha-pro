@@ -29,6 +29,7 @@ export const AttendanceActionModal: React.FC = () => {
     setCurrentUser,
     currentMatch,
     updateAttendance,
+    updateMatchDetails,
     playersMap,
     players,
   } = useApp();
@@ -43,6 +44,26 @@ export const AttendanceActionModal: React.FC = () => {
       if (typeof window === 'undefined') return;
 
       const params = new URLSearchParams(window.location.search);
+
+      // Sync match metadata from invite link if present
+      const mDate = params.get('mDate');
+      const mTime = params.get('mTime');
+      const mVenue = params.get('mVenue');
+      const mLoc = params.get('mLoc');
+      const mCost = params.get('mCost');
+      const mNo = params.get('mNo');
+
+      if (mDate || mVenue || mTime) {
+        updateMatchDetails({
+          ...(mDate ? { date: mDate } : {}),
+          ...(mTime ? { time: mTime } : {}),
+          ...(mVenue ? { venueName: mVenue } : {}),
+          ...(mLoc ? { venueLocation: mLoc } : {}),
+          ...(mCost && !isNaN(Number(mCost)) ? { costPerPlayer: Number(mCost) } : {}),
+          ...(mNo && !isNaN(Number(mNo)) ? { matchNumber: Number(mNo) } : {}),
+        });
+      }
+
       const playerParam =
         params.get('oyuncu') ||
         params.get('player') ||
@@ -100,12 +121,9 @@ export const AttendanceActionModal: React.FC = () => {
 
           // Clean up URL parameters cleanly
           const newUrl = new URL(window.location.href);
-          newUrl.searchParams.delete('oyuncu');
-          newUrl.searchParams.delete('player');
-          newUrl.searchParams.delete('p');
-          newUrl.searchParams.delete('durum');
-          newUrl.searchParams.delete('action');
-          newUrl.searchParams.delete('d');
+          ['oyuncu', 'player', 'p', 'durum', 'action', 'd', 'mDate', 'mTime', 'mVenue', 'mLoc', 'mCost', 'mNo'].forEach(
+            k => newUrl.searchParams.delete(k)
+          );
           window.history.replaceState({}, '', newUrl.toString());
           return;
         }
