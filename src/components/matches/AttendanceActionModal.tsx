@@ -137,14 +137,16 @@ export const AttendanceActionModal: React.FC = () => {
         return;
       }
 
-      // 3. Fallback: If logged in as player and pending confirmation
+      // 3. Fallback: If logged in as player and pending confirmation or new notification request arrived
       if (currentUser.playerId) {
         setActivePlayerId(currentUser.playerId);
         const status = currentMatch.attendance[currentUser.playerId] || 'Haber Bekleniyor';
         const isPending = status === 'Haber Bekleniyor' || status === 'Beklemede';
+        const req = currentMatch.attendanceRequests?.[currentUser.playerId];
+        const reqStamp = req?.status === 'pending' ? req.requestedAt : 'initial';
         const dismissedKey = `halisaha_prompt_dismissed_${currentMatch.id}_${currentUser.playerId}`;
 
-        if (isPending && !sessionStorage.getItem(dismissedKey)) {
+        if (isPending && sessionStorage.getItem(dismissedKey) !== reqStamp) {
           setModalMode('prompt');
           setIsOpen(true);
         }
@@ -152,7 +154,11 @@ export const AttendanceActionModal: React.FC = () => {
     } catch (err) {
       console.warn('AttendanceActionModal error:', err);
     }
-  }, [currentUser.playerId, currentMatch.id]);
+  }, [
+    currentUser.playerId,
+    currentMatch.id,
+    currentMatch.attendanceRequests?.[currentUser.playerId || '']?.requestedAt,
+  ]);
 
   const targetId = activePlayerId || currentUser.playerId;
   if (!isOpen || !targetId) return null;
@@ -160,6 +166,7 @@ export const AttendanceActionModal: React.FC = () => {
   const targetPlayer = playersMap[targetId];
   const playerName = targetPlayer ? targetPlayer.name : currentUser.name || 'Oyuncu';
   const exemptionInfo = isPlayerExemptForMatch(targetPlayer, currentMatch);
+  const activeRequest = currentMatch.attendanceRequests?.[targetId];
 
   const d = new Date(currentMatch.date);
   const dateFormatted = d.toLocaleDateString('tr-TR', {
@@ -183,7 +190,8 @@ export const AttendanceActionModal: React.FC = () => {
 
   const handleClose = () => {
     const dismissedKey = `halisaha_prompt_dismissed_${currentMatch.id}_${targetId}`;
-    sessionStorage.setItem(dismissedKey, 'true');
+    const reqStamp = activeRequest?.status === 'pending' ? activeRequest.requestedAt : 'initial';
+    sessionStorage.setItem(dismissedKey, reqStamp);
     setIsOpen(false);
   };
 

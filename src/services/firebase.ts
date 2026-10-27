@@ -125,6 +125,56 @@ export async function saveMatchToDatabase(match: Match): Promise<void> {
   }
 }
 
+export function subscribeToMatchUpdates(
+  matchId: string,
+  onUpdate: (match: Match) => void
+): () => void {
+  let unsubscribeFirestore: (() => void) | null = null;
+
+  if (firestoreInstance && matchId) {
+    try {
+      const matchRef = doc(firestoreInstance, 'matches', matchId);
+      unsubscribeFirestore = onSnapshot(
+        matchRef,
+        snapshot => {
+          if (snapshot.exists()) {
+            const remoteMatch = snapshot.data() as Match;
+            localStorage.setItem(STORAGE_KEY_MATCH, JSON.stringify(remoteMatch));
+            onUpdate(remoteMatch);
+          }
+        },
+        err => {
+          console.warn('Firestore match subscription error:', err);
+        }
+      );
+    } catch (err) {
+      console.warn('Failed to subscribe to Firestore match:', err);
+    }
+  }
+
+  const handleStorageEvent = (e: StorageEvent) => {
+    if (e.key === STORAGE_KEY_MATCH && e.newValue) {
+      try {
+        const parsed = JSON.parse(e.newValue) as Match;
+        if (parsed && parsed.id === matchId) {
+          onUpdate(parsed);
+        }
+      } catch {}
+    }
+  };
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('storage', handleStorageEvent);
+  }
+
+  return () => {
+    if (unsubscribeFirestore) unsubscribeFirestore();
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('storage', handleStorageEvent);
+    }
+  };
+}
+
 // Local Storage Accessors
 export function getLocalPlayers(): Player[] {
   try {

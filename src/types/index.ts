@@ -217,6 +217,14 @@ export interface Venue {
   defaultCost?: number; // Varsayılan saha ücreti (TL)
 }
 
+export interface AttendanceRequest {
+  playerId: string;
+  requestedAt: string;
+  requestedBy: string;
+  status: 'pending' | 'responded';
+  respondedAt?: string;
+}
+
 export interface Match {
   id: string;
   matchNumber: number;
@@ -237,6 +245,7 @@ export interface Match {
   teamB: Team;
   attendance: Record<string, AttendanceStatus>;
   attendanceTimestamps?: Record<string, string>; // playerId -> ISO confirmation timestamp
+  attendanceRequests?: Record<string, AttendanceRequest>; // playerId -> notification request status
   attendanceAdminAudits?: Record<string, { modifiedBy: string; modifiedAt: string; prevStatus?: string }>;
   payments: Record<string, MatchPayment>;
   goals?: MatchGoal[];

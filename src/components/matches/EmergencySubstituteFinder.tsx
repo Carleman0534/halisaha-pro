@@ -65,11 +65,16 @@ export const EmergencySubstituteFinder: React.FC<EmergencySubstituteFinderProps>
     isCouncil,
     isGuest,
     dismissDeclineAlert,
+    sendPlayerAttendanceRequest,
     sendReNotificationToPending,
   } = useApp();
 
   const [activeFilter, setActiveFilter] = useState<'all' | 'geliyor' | 'bekleniyor' | 'gelemiyor' | 'satti'>('bekleniyor');
   const [searchQuery, setSearchQuery] = useState('');
+  const [playerNotifyToast, setPlayerNotifyToast] = useState<{
+    player: Player;
+    message: string;
+  } | null>(null);
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [showEditMatchModal, setShowEditMatchModal] = useState<'edit' | 'create' | null>(null);
@@ -118,6 +123,19 @@ export const EmergencySubstituteFinder: React.FC<EmergencySubstituteFinderProps>
     }
   };
 
+  const handleSendPlayerNotification = async (player: Player) => {
+    const res = await sendPlayerAttendanceRequest(player.id);
+    if (res.success) {
+      try {
+        confetti({ particleCount: 25, spread: 50, origin: { y: 0.7 } });
+      } catch {}
+      setPlayerNotifyToast({
+        player,
+        message: res.message,
+      });
+    }
+  };
+
   // Check if URL opened with ?action=mvp
   React.useEffect(() => {
     try {
@@ -145,14 +163,13 @@ export const EmergencySubstituteFinder: React.FC<EmergencySubstituteFinderProps>
       const status = currentMatch.attendance[p.id];
       if (status === 'Geliyor' || status === 'Geldi') {
         geliyor.push(p);
-      } else if (status === 'Haber Bekleniyor' || status === 'Beklemede') {
-        bekleniyor.push(p);
       } else if (status === 'Satış koydu' || status === 'Son dakika iptal') {
         satti.push(p);
       } else if (status === 'Gelemiyor' || status === 'Gelmedi') {
         gelemiyor.push(p);
       } else {
-        diger.push(p);
+        // Until player responds, keep their status in 'bekleniyor' (Haber Bekleniyor)
+        bekleniyor.push(p);
       }
     });
 
@@ -1124,8 +1141,44 @@ ${generalDecline}
           </select>
         </div>
 
+        {/* Single Player Notification Dispatched Toast Banner */}
+        {playerNotifyToast && (
+          <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-950/80 via-slate-900 to-slate-900 border border-amber-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-lg animate-in fade-in">
+            <div className="flex items-start space-x-2.5">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center shrink-0 mt-0.5">
+                <BellRing className="w-4 h-4 animate-bounce" />
+              </div>
+              <div className="text-xs">
+                <span className="font-black text-white block">
+                  🔔 {playerNotifyToast.player.name} İçin Katılım Bildirimi Gönderildi!
+                </span>
+                <span className="text-[11px] text-amber-300/90 block">
+                  Oyuncu telefonundan yanıt verene kadar durumu <strong>"Haber Bekleniyor (Bekliyor)"</strong> olarak ayarlandı.
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-1.5 shrink-0">
+              <button
+                onClick={() => openPersonalWhatsAppPing(playerNotifyToast.player)}
+                className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center space-x-1 shadow-md transition-all active:scale-95"
+                title="Oyuncunun telefonuna tek tıkla yanıt linkini WhatsApp'tan da ilet"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span>WhatsApp ile Telefona İlet</span>
+              </button>
+              <button
+                onClick={() => setPlayerNotifyToast(null)}
+                className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold border border-slate-700"
+              >
+                Tamam
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Player List */}
-        <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+        <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1">
           {displayPlayers.length === 0 ? (
             <div className="p-6 text-center text-xs text-slate-500">
               Bu filtreye uygun oyuncu bulunamadı.
@@ -1138,6 +1191,8 @@ ${generalDecline}
               const isNotComing = status === 'Gelemiyor' || status === 'Gelmedi';
               const isSatti = status === 'Satış koydu' || status === 'Son dakika iptal';
               const isPaid = !!currentMatch.payments[p.id]?.isPaid;
+              const reqInfo = currentMatch.attendanceRequests?.[p.id];
+              const isWaitingNotificationResponse = reqInfo?.status === 'pending' && isPending;
 
               return (
                 <div
@@ -1165,11 +1220,22 @@ ${generalDecline}
                       }`}
                     />
                     <div>
-                      <div className="flex items-center space-x-1.5 flex-wrap">
+                      <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
                         <span className="font-bold text-xs text-white">{p.name}</span>
                         {p.isJoker && (
                           <span className="text-[8px] px-1 py-0.2 rounded bg-purple-500/20 text-purple-300 font-bold">
                             Joker
+                          </span>
+                        )}
+                        {isWaitingNotificationResponse && (
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold flex items-center space-x-1">
+                            <BellRing className="w-2.5 h-2.5 text-amber-400 animate-pulse" />
+                            <span>Haber Bekleniyor (Bildirim Gönderildi)</span>
+                          </span>
+                        )}
+                        {reqInfo?.status === 'responded' && !isPending && (
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold">
+                            📱 Bildirime Yanıt Verdi
                           </span>
                         )}
                         {isSatti && (
@@ -1214,6 +1280,20 @@ ${generalDecline}
                   {/* Action Area */}
                   {(isAdmin || isCouncil) ? (
                     <div className="flex items-center flex-wrap gap-1">
+                      {/* NEW BUTTON FOR EVERY PLAYER: SEND ATTENDANCE NOTIFICATION */}
+                      <button
+                        onClick={() => handleSendPlayerNotification(p)}
+                        title="Oyuncunun telefonuna maça gelip gelmeyeceğini soran bildirim gönder (Cevap verene kadar statüsü Bekliyor kalır)"
+                        className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-[10px] font-black border transition-all active:scale-95 ${
+                          isWaitingNotificationResponse
+                            ? 'bg-amber-500/25 text-amber-200 border-amber-400/60 hover:bg-amber-500/35'
+                            : 'bg-blue-600/25 hover:bg-blue-600/40 text-blue-200 border-blue-500/50 shadow-sm'
+                        }`}
+                      >
+                        <BellRing className="w-3 h-3 text-amber-400 shrink-0" />
+                        <span>{isWaitingNotificationResponse ? 'Tekrar Bildirim At' : 'Bildirim Gönder'}</span>
+                      </button>
+
                       {/* Coming Player In-match Payment & IBAN Actions */}
                       {isComing && (
                         <>
@@ -1238,33 +1318,23 @@ ${generalDecline}
                             <CreditCard className="w-3 h-3 text-emerald-400" />
                             <span>IBAN At</span>
                           </button>
-
-                          <button
-                            onClick={() => openOneDayPlayerWhatsApp(p)}
-                            title="Yarınki Maçı Hatırlat (WhatsApp Teyit)"
-                            className="p-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 text-xs transition-all active:scale-95"
-                          >
-                            <BellRing className="w-3.5 h-3.5" />
-                          </button>
                         </>
                       )}
 
-                      {/* Pending Ping */}
-                      {isPending && (
-                        <button
-                          onClick={() => openPersonalWhatsAppPing(p)}
-                          title="WhatsApp'tan Durum Sor"
-                          className="flex items-center space-x-1 px-2 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold transition-all active:scale-95"
-                        >
-                          <MessageCircle className="w-3 h-3" />
-                          <span>Sor</span>
-                        </button>
-                      )}
+                      {/* WhatsApp Direct Link Button */}
+                      <button
+                        onClick={() => openPersonalWhatsAppPing(p)}
+                        title="WhatsApp'tan Tek Tıkla Yanıt Linki Gönder"
+                        className="flex items-center space-x-1 px-2 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold transition-all active:scale-95"
+                      >
+                        <MessageCircle className="w-3 h-3" />
+                        <span>WP Sor</span>
+                      </button>
 
-                      {/* 4 Attendance Status Buttons */}
+                      {/* 4 Manual Attendance Status Buttons for Admin / Council */}
                       <button
                         onClick={() => updateAttendance(p.id, 'Geliyor')}
-                        title="Geliyor Olarak İşaretle (Kadroya Alınır)"
+                        title="Manuel: Geliyor Olarak İşaretle (Kadroya Alınır)"
                         className={`px-2 py-1 rounded-lg text-[10px] font-black border transition-all ${
                           isComing
                             ? 'bg-emerald-500 text-black border-emerald-400 shadow-sm'
@@ -1276,7 +1346,7 @@ ${generalDecline}
 
                       <button
                         onClick={() => updateAttendance(p.id, 'Haber Bekleniyor')}
-                        title="Haber Bekleniyor / Beklemede"
+                        title="Manuel: Haber Bekleniyor / Bekliyor"
                         className={`px-2 py-1 rounded-lg text-[10px] font-black border transition-all ${
                           isPending
                             ? 'bg-amber-500 text-black border-amber-400 shadow-sm'
@@ -1288,7 +1358,7 @@ ${generalDecline}
 
                       <button
                         onClick={() => updateAttendance(p.id, 'Gelemiyor')}
-                        title="Gelemiyor Olarak İşaretle"
+                        title="Manuel: Gelemiyor Olarak İşaretle"
                         className={`px-2 py-1 rounded-lg text-[10px] font-black border transition-all ${
                           isNotComing
                             ? 'bg-slate-700 text-white border-slate-600 shadow-sm'
@@ -1300,7 +1370,7 @@ ${generalDecline}
 
                       <button
                         onClick={() => updateAttendance(p.id, 'Satış koydu')}
-                        title="Son Anda Satış Koydu (-15 Ceza Puanı, Kadrodan Çıkarılır)"
+                        title="Manuel: Son Anda Satış Koydu (-15 Ceza Puanı, Kadrodan Çıkarılır)"
                         className={`px-2 py-1 rounded-lg text-[10px] font-black border transition-all ${
                           isSatti
                             ? 'bg-rose-600 text-white border-rose-500 shadow-md animate-pulse'
@@ -1311,7 +1381,7 @@ ${generalDecline}
                       </button>
                     </div>
                   ) : (
-                    /* Guest View */
+                    /* Player / Guest View */
                     <div className="flex items-center space-x-1.5">
                       {currentUser.playerId === p.id ? (
                         /* Self-Attendance confirmation buttons for the logged-in player */
@@ -1350,7 +1420,7 @@ ${generalDecline}
                               : 'bg-slate-800 text-slate-400 border-slate-700'
                           }`}
                         >
-                          {isSatti ? 'Sattı 🚨' : isComing ? 'Geliyor' : isPending ? 'Bekliyor' : 'Gelmiyor'}
+                          {isSatti ? 'Sattı 🚨' : isComing ? 'Geliyor' : isPending ? 'Haber Bekleniyor' : 'Gelmiyor'}
                         </span>
                       )}
                     </div>

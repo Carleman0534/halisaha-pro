@@ -50,6 +50,7 @@ import {
   saveLocalVenues,
   saveVenueToDatabase,
   buildGoogleMapsUrl,
+  subscribeToMatchUpdates,
 } from '../services/firebase';
 import { sendSystemNotification } from '../services/notifications';
 import { isPlayerExemptForMatch } from '../utils/permissions';
@@ -98,6 +99,9 @@ interface AppContextType {
     matchId: string
   ) => { success: boolean; newStatus?: SquadLockStatus; error?: string };
   dismissDeclineAlert: (matchId: string, alertId: string) => void;
+  sendPlayerAttendanceRequest: (
+    playerId: string
+  ) => Promise<{ success: boolean; message: string }>;
   sendReNotificationToPending: (
     matchId: string
   ) => Promise<{
@@ -365,6 +369,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const refreshFirebaseStatus = () => {
     setFirebaseActive(isFirebaseConnected());
   };
+
+  // Realtime sync subscription for currentMatch (Firestore & Cross-tab storage)
+  useEffect(() => {
+    const unsubscribe = subscribeToMatchUpdates(currentMatch.id, remoteMatch => {
+      setCurrentMatch(remoteMatch);
+    });
+    return () => unsubscribe();
+  }, [currentMatch.id, firebaseActive]);
 
   // Fast map lookup
   const playersMap = useMemo(() => {
@@ -824,6 +836,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         },
       };
 
+      const isPendingNow = status === 'Haber Bekleniyor' || status === 'Beklemede';
+      const existingReq = prev.attendanceRequests?.[playerId];
+      const updatedRequests = {
+        ...(prev.attendanceRequests || {}),
+        ...(existingReq
+          ? {
+              [playerId]: {
+                ...existingReq,
+                status: isPendingNow ? ('pending' as const) : ('responded' as const),
+                respondedAt: isPendingNow ? undefined : new Date().toISOString(),
+              },
+            }
+          : {}),
+      };
+
       let newSquad = [...prev.squad];
       if (status === 'Geliyor' || status === 'Geldi') {
         if (!newSquad.includes(playerId)) {
@@ -863,6 +890,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         squad: newSquad,
         attendance: updatedAttendance,
         attendanceTimestamps: updatedTimestamps,
+        attendanceRequests: updatedRequests,
         attendanceAdminAudits: updatedAudits,
         adminDeclineAlerts: updatedAlerts,
       };
@@ -939,6 +967,82 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } else {
       setPastMatches(prev => prev.map(m => (m.id === matchId ? filterAlerts(m) : m)));
     }
+  };
+
+  // Send targeted attendance notification request to a single player
+  // Sets their status to "Haber Bekleniyor" (Bekliyor) until they respond
+  const sendPlayerAttendanceRequest = async (
+    playerId: string
+  ): Promise<{ success: boolean; message: string }> => {
+    const player = playersMap[playerId];
+    if (!player) {
+      return { success: false, message: 'Oyuncu bulunamadı.' };
+    }
+
+    const nowIso = new Date().toISOString();
+
+    setCurrentMatch(prev => {
+      const updatedAttendance = {
+        ...prev.attendance,
+        [playerId]: 'Haber Bekleniyor' as AttendanceStatus,
+      };
+
+      const updatedRequests = {
+        ...(prev.attendanceRequests || {}),
+        [playerId]: {
+          playerId,
+          requestedAt: nowIso,
+          requestedBy: currentUser.name,
+          status: 'pending' as const,
+        },
+      };
+
+      const dispatchLog: NotificationDispatchLog = {
+        id: `disp_${Date.now()}_${playerId}`,
+        matchId: prev.id,
+        matchNumber: prev.matchNumber,
+        dispatchedAt: nowIso,
+        dispatchedBy: currentUser.name,
+        totalTargeted: 1,
+        successfulCount: 1,
+        failedCount: 0,
+        channel: 'web_push',
+        recipients: [
+          {
+            playerId: player.id,
+            playerName: player.name,
+            phone: player.phone,
+            status: 'delivered',
+          },
+        ],
+        note: `${player.name} için maça katılım bildirimi gönderildi (Haber Bekleniyor).`,
+      };
+
+      appendLocalNotificationLog(dispatchLog);
+
+      const nextMatch: Match = {
+        ...prev,
+        attendance: updatedAttendance,
+        attendanceRequests: updatedRequests,
+        notificationLogs: [dispatchLog, ...(prev.notificationLogs || []).slice(0, 20)],
+      };
+
+      saveMatchToDatabase(nextMatch);
+      return nextMatch;
+    });
+
+    try {
+      await sendSystemNotification({
+        title: `⚽ ${player.name} — Maça Geliyor musun?`,
+        body: `${currentMatch.matchNumber}. Hafta (${currentMatch.venueName}, ${currentMatch.time}) maçı için katılım onayınız bekleniyor!`,
+        tag: `invite-req-${currentMatch.id}-${playerId}-${Date.now()}`,
+      });
+    } catch {}
+
+    return {
+      success: true,
+      message: `${player.name} adlı oyuncuya katılım bildirimi gönderildi! Cevap verene kadar durumu "Bekliyor" olarak ayarlandı.`,
+    };
   };
 
   // Re-notify pending players with rate-limit and auditing
@@ -1677,6 +1781,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         restoreSquadVersion,
         toggleSquadLock,
         dismissDeclineAlert,
+        sendPlayerAttendanceRequest,
         sendReNotificationToPending,
         setMatchScores,
         createNewMatch,
