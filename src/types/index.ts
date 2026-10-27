@@ -209,12 +209,23 @@ export interface NotificationDispatchLog {
   note?: string;
 }
 
+export interface Venue {
+  id: string;
+  name: string;
+  location: string; // Açık adres, semt veya Google Maps linki
+  mapsUrl: string; // Google Maps yol tarifi / konum bağlantısı
+  defaultCost?: number; // Varsayılan saha ücreti (TL)
+}
+
 export interface Match {
   id: string;
   matchNumber: number;
   date: string; // YYYY-MM-DD
   time: string; // "21:00 - 22:00"
+  venueId?: string;
   venueName: string;
+  venueLocation?: string;
+  venueMapsUrl?: string;
   pitchNo: string;
   totalPitchCost: number;
   costPerPlayer: number;

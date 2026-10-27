@@ -14,11 +14,13 @@ import {
   DeclineAlert,
   NotificationDispatchLog,
   Team,
+  Venue,
 } from '../types';
 import {
   COUNCIL_MEMBERS,
   RAW_PLAYERS_DATA,
   INITIAL_MATCH,
+  INITIAL_VENUES,
   PAST_MATCHES,
   CRITERIA_KEYS,
   ADMIN_USERS,
@@ -44,6 +46,10 @@ import {
   appendLocalExemptionAuditLog,
   getLocalNotificationLogs,
   appendLocalNotificationLog,
+  getLocalVenues,
+  saveLocalVenues,
+  saveVenueToDatabase,
+  buildGoogleMapsUrl,
 } from '../services/firebase';
 import { sendSystemNotification } from '../services/notifications';
 import { isPlayerExemptForMatch } from '../utils/permissions';
@@ -53,6 +59,10 @@ interface AppContextType {
   playersMap: Record<string, Player>;
   currentMatch: Match;
   pastMatches: Match[];
+  venues: Venue[];
+  addVenue: (name: string, location: string, defaultCost?: number) => Venue;
+  updateVenue: (venue: Venue) => void;
+  deleteVenue: (venueId: string) => void;
   currentEvaluator: Evaluator;
   setCurrentEvaluator: (evaluator: Evaluator) => void;
   updateRating: (playerId: string, evaluatorId: string, criterionKey: string, score: number) => void;
@@ -99,7 +109,15 @@ interface AppContextType {
     log?: NotificationDispatchLog;
   }>;
   setMatchScores: (scoreA: number, scoreB: number, goals?: MatchGoal[], mvpWinnerId?: string) => void;
-  createNewMatch: (date: string, time: string, cost: number, venue: string) => void;
+  createNewMatch: (
+    date: string,
+    time: string,
+    cost: number,
+    venue: string,
+    venueLocation?: string,
+    venueMapsUrl?: string,
+    venueId?: string
+  ) => void;
   addPlayer: (
     name: string,
     pos: Position,
@@ -207,6 +225,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     return cached;
   });
+
+  const [venues, setVenues] = useState<Venue[]>(() => {
+    const cached = getLocalVenues(INITIAL_VENUES);
+    saveLocalVenues(cached);
+    return cached;
+  });
+
+  const addVenue = (name: string, location: string, defaultCost?: number): Venue => {
+    const cleanName = name.trim() || 'Yeni Halı Saha';
+    const cleanLoc = location.trim();
+    const newVenue: Venue = {
+      id: `venue_${Date.now()}`,
+      name: cleanName,
+      location: cleanLoc || cleanName,
+      mapsUrl: buildGoogleMapsUrl(cleanName, cleanLoc),
+      defaultCost: defaultCost && defaultCost > 0 ? defaultCost : 2800,
+    };
+    setVenues(prev => {
+      const next = [...prev, newVenue];
+      saveVenueToDatabase(newVenue, next);
+      return next;
+    });
+    return newVenue;
+  };
+
+  const updateVenue = (updated: Venue) => {
+    const withMaps: Venue = {
+      ...updated,
+      mapsUrl: buildGoogleMapsUrl(updated.name, updated.location),
+    };
+    setVenues(prev => {
+      const next = prev.map(v => (v.id === withMaps.id ? withMaps : v));
+      saveVenueToDatabase(withMaps, next);
+      return next;
+    });
+  };
+
+  const deleteVenue = (venueId: string) => {
+    setVenues(prev => {
+      const next = prev.filter(v => v.id !== venueId);
+      saveLocalVenues(next);
+      return next;
+    });
+  };
 
   const [currentEvaluator, setCurrentEvaluator] = useState<Evaluator>(COUNCIL_MEMBERS[0]);
   const [firebaseActive, setFirebaseActive] = useState<boolean>(isFirebaseConnected());
@@ -1107,7 +1169,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Create next match
-  const createNewMatch = (date: string, time: string, cost: number, venue: string) => {
+  const createNewMatch = (
+    date: string,
+    time: string,
+    cost: number,
+    venue: string,
+    venueLocation?: string,
+    venueMapsUrl?: string,
+    venueId?: string
+  ) => {
     setPastMatches(prev => {
       const next = [currentMatch, ...prev.filter(m => m.id !== currentMatch.id)];
       saveLocalPastMatches(next);
@@ -1123,7 +1193,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       matchNumber: nextNumber,
       date,
       time,
+      venueId,
       venueName: venue,
+      venueLocation: venueLocation || venue,
+      venueMapsUrl: venueMapsUrl || buildGoogleMapsUrl(venue, venueLocation),
       pitchNo: 'Saha 1',
       totalPitchCost: cost,
       costPerPlayer: Math.round(cost / 14),
@@ -1585,6 +1658,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         playersMap,
         currentMatch,
         pastMatches,
+        venues,
+        addVenue,
+        updateVenue,
+        deleteVenue,
         currentEvaluator,
         setCurrentEvaluator,
         updateRating,

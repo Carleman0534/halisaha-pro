@@ -27,13 +27,16 @@ import {
   AlertTriangle,
   Trophy,
   Star,
+  Navigation,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useApp } from '../../context/AppContext';
 import { Player, AttendanceStatus, Position } from '../../types';
 import { sendOneDayBeforeReminder } from '../../services/notifications';
+import { getMatchMapsUrl } from '../../services/firebase';
 import { AddToCalendarModal } from '../common/AddToCalendarModal';
 import { EditMatchModal } from './EditMatchModal';
+import { VenueManagerModal } from './VenueManagerModal';
 import { PlayerAttendanceConfirmCard } from './PlayerAttendanceConfirmCard';
 import { AuthRoleModal } from '../auth/AuthRoleModal';
 import { WeatherWidget } from '../common/WeatherWidget';
@@ -70,6 +73,7 @@ export const EmergencySubstituteFinder: React.FC<EmergencySubstituteFinderProps>
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [showEditMatchModal, setShowEditMatchModal] = useState<'edit' | 'create' | null>(null);
+  const [showVenueModal, setShowVenueModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showMvpModal, setShowMvpModal] = useState(false);
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
@@ -296,6 +300,8 @@ export const EmergencySubstituteFinder: React.FC<EmergencySubstituteFinderProps>
     return list;
   }, [activeFilter, players, categorizedPlayers, selectedPositionFilter, searchQuery]);
 
+  const matchMapsUrl = useMemo(() => getMatchMapsUrl(currentMatch), [currentMatch]);
+
   // WhatsApp Broadcast Text Generator
   const generateBroadcastText = () => {
     const gelenlerLines = categorizedPlayers.geliyor
@@ -315,7 +321,8 @@ export const EmergencySubstituteFinder: React.FC<EmergencySubstituteFinderProps>
 
     return `⚽ *HALI SAHA MAÇI YOKLAMASI & ACİL ÇAĞRI* ⚽
 📅 *Tarih:* ${dateFormatted} | ${currentMatch.time}
-📍 *Saha:* ${currentMatch.venueName} (${currentMatch.pitchNo})
+📍 *Saha:* ${currentMatch.venueName}
+🗺️ *Konum (Google Maps):* ${matchMapsUrl}
 👥 *Format:* ${currentMatch.matchFormat || '7v7'} (Hedef: ${targetCount} Kişi)
 💰 *Kişi Başı Ücret:* ${currentMatch.costPerPlayer} ₺
 
@@ -366,6 +373,7 @@ ${
     const text = encodeURIComponent(
       `Selam ${player.name}, ${day} günü saat ${timeOnly}'de halı saha maçımız var! ⚽🔥\n` +
       `📍 Saha: ${currentMatch.venueName}\n` +
+      `🗺️ Konum (Google Maps): ${matchMapsUrl}\n` +
       `💰 Ücret: ${currentMatch.costPerPlayer} ₺\n\n` +
       `👇 Lütfen katılım durumunu tek tıkla onayla:\n\n` +
       `🟢 *[ONAYLIYORUM (MAÇA GELİYORUM)]:*\n${yesUrl}\n\n` +
@@ -385,7 +393,8 @@ ${
     const text = encodeURIComponent(
       `🚨 *ACİL YEDEK OYUNCU ÇAĞRISI* 🚨\n\n` +
       `Selam ${player.name}, ${day} günü saat ${timeOnly}'de maçımızda acil ${player.primaryPosition} eksiğimiz var, kadroya girmek ister misin? ⚽🔥\n` +
-      `📍 Saha: ${currentMatch.venueName}\n\n` +
+      `📍 Saha: ${currentMatch.venueName}\n` +
+      `🗺️ Konum (Google Maps): ${matchMapsUrl}\n\n` +
       `🟢 *[GELİYORUM (KADROYA GİR)]:*\n${yesUrl}\n\n` +
       `🔴 *[GELEMİYORUM]:*\n${noUrl}`
     );
@@ -404,6 +413,7 @@ ${
       `⏰ *YARINKİ MAÇ SON TEYİT BİLDİRİMİ* ⏰\n\n` +
       `Selam ${player.name}, yarın saat ${timeOnly}'de halı saha maçımız var! ⚽🔥\n` +
       `📍 Saha: ${currentMatch.venueName}\n` +
+      `🗺️ Konum (Google Maps): ${matchMapsUrl}\n` +
       `💰 Kişi Başı: ${currentMatch.costPerPlayer} ₺\n\n` +
       `Kadro netleştiriliyor. Lütfen katılım durumunu hemen onayla:\n\n` +
       `🟢 *[ONAYLIYORUM (MAÇA GELİYORUM)]:*\n${yesUrl}\n\n` +
@@ -423,7 +433,8 @@ ${
     const text = encodeURIComponent(
       `⏳ *HALI SAHA MAÇI TEYİT ÇAĞRISI* ⏳\n\n` +
       `📅 *Tarih:* ${dateFormatted} | ${currentMatch.time}\n` +
-      `📍 *Saha:* ${currentMatch.venueName}\n\n` +
+      `📍 *Saha:* ${currentMatch.venueName}\n` +
+      `🗺️ *Konum (Google Maps):* ${matchMapsUrl}\n\n` +
       `Kadromuzu kesinleştirmek için aşağıdaki arkadaşlarımızın ACİLEN durumunu bildirmesi gerekmektedir:\n\n` +
       `${pendingNames || 'Tüm cevaplar alındı'}\n\n` +
       `📲 *Lütfen aşağıdaki linke tıklayıp [Maça Geliyorum] veya [Gelmiyorum] butonuna basarak onay verin:*\n` +
@@ -444,7 +455,8 @@ ${
 
     const text = encodeURIComponent(`⏰ *YARIN MAÇ GÜNÜ! (SON KATILIM TEYİDİ & HATIRLATMA)* ⏰
 📅 *Tarih:* Yarın (${dateFormatted}) | ${currentMatch.time}
-📍 *Saha:* ${currentMatch.venueName} (${currentMatch.pitchNo})
+📍 *Saha:* ${currentMatch.venueName}
+🗺️ *Konum (Google Maps):* ${matchMapsUrl}
 👥 *Kadro Durumu:* ${comingCount}/${targetCount} Kişi Onayladı
 💰 *Kişi Başı Ücret:* ${currentMatch.costPerPlayer} ₺
 
@@ -547,9 +559,17 @@ ${generalDecline}
             <span>{currentMatch.matchNumber}. HAFTA MAÇI</span>
           </div>
 
-          <div className="flex items-center space-x-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             {(isAdmin || isCouncil) && (
               <>
+                <button
+                  onClick={() => setShowVenueModal(true)}
+                  className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-[11px] font-bold transition-all active:scale-95 shadow-sm"
+                  title="Kayıtlı Sahaları Yönet ve Yeni Saha Ekle"
+                >
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span>Sahalar</span>
+                </button>
                 <button
                   onClick={() => setShowEditMatchModal('edit')}
                   className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-[11px] font-bold transition-all active:scale-95 shadow-sm"
@@ -582,20 +602,28 @@ ${generalDecline}
         </div>
 
         {/* Date Display */}
-        <h2 className="text-lg font-black text-white capitalize leading-tight mb-1">{dateFormatted}</h2>
+        <h2 className="text-lg font-black text-white capitalize leading-tight mb-1.5">{dateFormatted}</h2>
 
         <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300 mb-3">
-          <div className="flex items-center space-x-1 bg-slate-950/60 px-2 py-1 rounded-lg border border-slate-800">
+          <div className="flex items-center space-x-1 bg-slate-950/60 px-2.5 py-1 rounded-lg border border-slate-800">
             <Clock className="w-3.5 h-3.5 text-emerald-400" />
             <span className="font-semibold text-white">{currentMatch.time}</span>
           </div>
-          <div className="flex items-center space-x-1 bg-slate-950/60 px-2 py-1 rounded-lg border border-slate-800">
-            <MapPin className="w-3.5 h-3.5 text-rose-400" />
-            <span>{currentMatch.venueName}</span>
+          <div className="flex items-center space-x-1 bg-slate-950/60 px-2.5 py-1 rounded-lg border border-slate-800">
+            <MapPin className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+            <span className="font-semibold text-white">{currentMatch.venueName}</span>
           </div>
-          <div className="text-[10px] px-2 py-1 rounded-lg bg-slate-950/60 text-slate-300 border border-slate-800">
-            {currentMatch.pitchNo}
-          </div>
+          <a
+            href={matchMapsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center space-x-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 px-2.5 py-1 rounded-lg border border-blue-500/40 font-bold transition-all active:scale-95"
+            title="Saha Konumunu Google Maps'te Aç ve Yol Tarifi Al"
+          >
+            <Navigation className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+            <span>Konum / Yol Tarifi</span>
+            <ExternalLink className="w-2.5 h-2.5 opacity-80" />
+          </a>
           <div className="text-[10px] px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 font-bold">
             {currentMatch.matchFormat || '7v7'} ({targetCount} Kişi)
           </div>
@@ -1535,6 +1563,11 @@ ${generalDecline}
           match={currentMatch}
           onClose={() => setShowVisualCardModal(false)}
         />
+      )}
+
+      {/* VENUE MANAGER MODAL */}
+      {showVenueModal && (
+        <VenueManagerModal onClose={() => setShowVenueModal(false)} />
       )}
     </div>
   );

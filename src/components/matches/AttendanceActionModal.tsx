@@ -14,10 +14,13 @@ import {
   BellRing,
   ShieldCheck,
   RotateCcw,
+  Navigation,
+  ExternalLink,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useApp } from '../../context/AppContext';
 import { isPlayerExemptForMatch } from '../../utils/permissions';
+import { getMatchMapsUrl } from '../../services/firebase';
 import { AppUser } from '../../types';
 
 export const AttendanceActionModal: React.FC = () => {
@@ -229,7 +232,7 @@ export const AttendanceActionModal: React.FC = () => {
             </div>
 
             {/* Match Info Pill */}
-            <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-2xl text-left text-xs space-y-1.5">
+            <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-2xl text-left text-xs space-y-2">
               <div className="flex items-center space-x-2 text-slate-200">
                 <Calendar className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span className="font-bold capitalize">{dateFormatted}</span>
@@ -238,11 +241,28 @@ export const AttendanceActionModal: React.FC = () => {
                 <Clock className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span>Saat: <strong className="text-white">{currentMatch.time}</strong></span>
               </div>
-              <div className="flex items-center space-x-2 text-slate-300">
-                <MapPin className="w-4 h-4 text-rose-400 shrink-0" />
-                <span>{currentMatch.venueName} ({currentMatch.pitchNo})</span>
+              <div className="flex items-center justify-between gap-2 pt-0.5">
+                <div className="flex items-center space-x-2 text-slate-200 min-w-0">
+                  <MapPin className="w-4 h-4 text-rose-400 shrink-0" />
+                  <div className="truncate">
+                    <span className="font-bold text-white block truncate">{currentMatch.venueName}</span>
+                    {currentMatch.venueLocation && currentMatch.venueLocation !== currentMatch.venueName && (
+                      <span className="text-[10px] text-slate-400 block truncate">{currentMatch.venueLocation}</span>
+                    )}
+                  </div>
+                </div>
+                <a
+                  href={getMatchMapsUrl(currentMatch)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1.5 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/40 text-blue-300 text-[11px] font-bold flex items-center space-x-1 shrink-0 transition-all active:scale-95"
+                >
+                  <Navigation className="w-3 h-3 text-blue-400" />
+                  <span>Konum</span>
+                  <ExternalLink className="w-2.5 h-2.5" />
+                </a>
               </div>
-              <div className="flex items-center justify-between pt-1 border-t border-slate-800 text-[11px]">
+              <div className="flex items-center justify-between pt-1.5 border-t border-slate-800 text-[11px]">
                 <span className="text-slate-400">Kişi Başı Ücret:</span>
                 {exemptionInfo.isExempt ? (
                   <span className="font-bold text-emerald-400">0 ₺ (🛡️ Muafsınız)</span>
@@ -308,7 +328,7 @@ export const AttendanceActionModal: React.FC = () => {
             )}
 
             {/* Match summary */}
-            <div className="p-3 bg-slate-950/80 border border-emerald-500/30 rounded-2xl text-left text-xs space-y-1">
+            <div className="p-3 bg-slate-950/80 border border-emerald-500/30 rounded-2xl text-left text-xs space-y-1.5">
               <div className="flex justify-between">
                 <span className="text-slate-400">Tarih:</span>
                 <span className="font-bold text-white capitalize">{dateFormatted}</span>
@@ -317,9 +337,17 @@ export const AttendanceActionModal: React.FC = () => {
                 <span className="text-slate-400">Saat:</span>
                 <span className="font-bold text-emerald-400">{currentMatch.time}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Saha:</span>
-                <span className="font-bold text-white">{currentMatch.venueName}</span>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-slate-400 shrink-0">Saha:</span>
+                <a
+                  href={getMatchMapsUrl(currentMatch)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-bold text-blue-300 hover:text-blue-200 flex items-center space-x-1 truncate"
+                >
+                  <span className="truncate">{currentMatch.venueName}</span>
+                  <Navigation className="w-3 h-3 text-blue-400 shrink-0" />
+                </a>
               </div>
               <div className="flex justify-between pt-1 border-t border-slate-800">
                 <span className="text-slate-400">Ücret:</span>

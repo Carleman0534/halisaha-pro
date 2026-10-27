@@ -1,4 +1,4 @@
-import { Position, Evaluator, CouncilRule, CriterionRubric, Player, Match, AppUser } from '../types';
+import { Position, Evaluator, CouncilRule, CriterionRubric, Player, Match, AppUser, Venue } from '../types';
 
 export const CRITERIA_KEYS = [
   { key: 'pas', label: 'Pas' },
@@ -327,13 +327,40 @@ export const RAW_PLAYERS_DATA = [
   { id: 'p_ali_guvenlik', name: 'Ali (Güvenlik)', pos: 'Defans' as Position, secPos: undefined, base: 7.6, joker: false, high: ["fizikselGuc", "defansifKatki"], low: ["dribbling"] },
 ];
 
+export const INITIAL_VENUES: Venue[] = [
+  {
+    id: 'venue_olimpiyat',
+    name: 'Olimpiyat Halı Saha Tesisleri',
+    location: 'Olimpiyat Spor Tesisleri Halı Saha',
+    mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Olimpiyat+Hal%C4%B1+Saha+Tesisleri',
+    defaultCost: 2800,
+  },
+  {
+    id: 'venue_arena',
+    name: 'Arena Spor Kompleksi',
+    location: 'Arena Halı Saha Spor Kompleksi',
+    mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Arena+Hal%C4%B1+Saha+Spor+Kompleksi',
+    defaultCost: 2800,
+  },
+  {
+    id: 'venue_yildiz',
+    name: 'Yıldız Sosyal Halı Saha',
+    location: 'Yıldız Sosyal Tesisleri Halı Saha',
+    mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Y%C4%B1ld%C4%B1z+Sosyal+Tesisleri+Hal%C4%B1+Saha',
+    defaultCost: 2800,
+  },
+];
+
 export const INITIAL_MATCH: Match = {
   id: 'match_current',
   matchNumber: 44,
   date: '2026-10-28', // Next Wednesday match
   time: '21:00 - 22:00',
+  venueId: 'venue_olimpiyat',
   venueName: 'Olimpiyat Halı Saha Tesisleri',
-  pitchNo: 'Saha 1 (Kapalı Suni Çim)',
+  venueLocation: 'Olimpiyat Spor Tesisleri Halı Saha',
+  venueMapsUrl: 'https://www.google.com/maps/search/?api=1&query=Olimpiyat+Hal%C4%B1+Saha+Tesisleri',
+  pitchNo: 'Saha 1',
   totalPitchCost: 2800,
   costPerPlayer: 200,
   matchFormat: '7v7',

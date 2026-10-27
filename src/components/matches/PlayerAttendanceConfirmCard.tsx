@@ -14,10 +14,13 @@ import {
   ArrowRight,
   ShieldCheck,
   HelpCircle,
+  Navigation,
+  ExternalLink,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useApp } from '../../context/AppContext';
 import { isPlayerExemptForMatch } from '../../utils/permissions';
+import { getMatchMapsUrl } from '../../services/firebase';
 
 interface PlayerAttendanceConfirmCardProps {
   onOpenAuthModal?: () => void;
@@ -160,6 +163,29 @@ export const PlayerAttendanceConfirmCard: React.FC<PlayerAttendanceConfirmCardPr
             Değiştir
           </button>
         )}
+      </div>
+
+      {/* Venue & Google Maps Quick Bar for Invited Player */}
+      <div className="p-2.5 rounded-xl bg-slate-950/75 border border-slate-800 flex items-center justify-between gap-2 text-xs">
+        <div className="flex items-center space-x-2 min-w-0">
+          <MapPin className="w-4 h-4 text-rose-400 shrink-0" />
+          <div className="min-w-0">
+            <span className="font-bold text-white block truncate">{currentMatch.venueName}</span>
+            {currentMatch.venueLocation && currentMatch.venueLocation !== currentMatch.venueName && (
+              <span className="text-[10px] text-slate-400 block truncate">{currentMatch.venueLocation}</span>
+            )}
+          </div>
+        </div>
+        <a
+          href={getMatchMapsUrl(currentMatch)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-2.5 py-1.5 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/40 text-blue-300 text-[11px] font-bold flex items-center space-x-1 shrink-0 transition-all active:scale-95"
+        >
+          <Navigation className="w-3 h-3 text-blue-400" />
+          <span>Yol Tarifi (Maps)</span>
+          <ExternalLink className="w-2.5 h-2.5" />
+        </a>
       </div>
 
       {/* Action Buttons (Geliyorum / Gelmiyorum / Bekliyor) */}

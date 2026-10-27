@@ -8,7 +8,7 @@ import {
   onSnapshot,
   Firestore,
 } from 'firebase/firestore';
-import { FirebaseConfig, Player, Match, Transaction, ExemptionAuditLog, NotificationDispatchLog } from '../types';
+import { FirebaseConfig, Player, Match, Transaction, ExemptionAuditLog, NotificationDispatchLog, Venue } from '../types';
 
 const STORAGE_KEY_CONFIG = 'halisaha_firebase_config';
 const STORAGE_KEY_PLAYERS = 'halisaha_local_players';
@@ -17,6 +17,7 @@ const STORAGE_KEY_PAST_MATCHES = 'halisaha_local_past_matches';
 const STORAGE_KEY_TRANSACTIONS = 'halisaha_local_transactions';
 const STORAGE_KEY_EXEMPTION_LOGS = 'halisaha_local_exemption_audit_logs';
 const STORAGE_KEY_NOTIFICATION_LOGS = 'halisaha_local_notification_dispatch_logs';
+const STORAGE_KEY_VENUES = 'halisaha_local_venues';
 
 let firestoreInstance: Firestore | null = null;
 let appInstance: FirebaseApp | null = null;
@@ -203,4 +204,55 @@ export function appendLocalNotificationLog(log: NotificationDispatchLog): void {
   logs.unshift(log);
   if (logs.length > 50) logs.length = 50;
   localStorage.setItem(STORAGE_KEY_NOTIFICATION_LOGS, JSON.stringify(logs));
+}
+
+// ==========================================
+// VENUES & GOOGLE MAPS HELPERS
+// ==========================================
+
+export function buildGoogleMapsUrl(venueName: string, locationInput?: string): string {
+  const loc = (locationInput || '').trim();
+  if (/^https?:\/\//i.test(loc)) {
+    return loc;
+  }
+  const searchQuery = loc ? `${venueName} ${loc}` : venueName;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(searchQuery.trim() || 'Halı Saha')}`;
+}
+
+export function getMatchMapsUrl(match: {
+  venueName: string;
+  venueLocation?: string;
+  venueMapsUrl?: string;
+}): string {
+  if (match.venueMapsUrl && /^https?:\/\//i.test(match.venueMapsUrl.trim())) {
+    return match.venueMapsUrl.trim();
+  }
+  return buildGoogleMapsUrl(match.venueName, match.venueLocation);
+}
+
+export function getLocalVenues(defaults: Venue[]): Venue[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_VENUES);
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : defaults;
+  } catch {
+    return defaults;
+  }
+}
+
+export function saveLocalVenues(venues: Venue[]): void {
+  localStorage.setItem(STORAGE_KEY_VENUES, JSON.stringify(venues));
+}
+
+export async function saveVenueToDatabase(venue: Venue, allVenues: Venue[]): Promise<void> {
+  saveLocalVenues(allVenues);
+  if (firestoreInstance) {
+    try {
+      const venueRef = doc(firestoreInstance, 'venues', venue.id);
+      await setDoc(venueRef, venue, { merge: true });
+    } catch (err) {
+      console.warn('Firestore venue write failed, cached locally:', err);
+    }
+  }
 }

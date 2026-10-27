@@ -16,6 +16,7 @@ import {
 import confetti from 'canvas-confetti';
 import { useApp } from '../../context/AppContext';
 import { isPlayerExemptForMatch } from '../../utils/permissions';
+import { getMatchMapsUrl } from '../../services/firebase';
 import { Player } from '../../types';
 
 interface WhatsAppInviteModalProps {
@@ -71,6 +72,8 @@ export const WhatsAppInviteModal: React.FC<WhatsAppInviteModalProps> = ({ player
     ? '0 ₺ (🛡️ Sen Muafsın)'
     : `${currentMatch.costPerPlayer} ₺`;
 
+  const mapsUrl = useMemo(() => getMatchMapsUrl(currentMatch), [currentMatch]);
+
   // Generated templates with 1-tap links
   const generatedText = useMemo(() => {
     const name = activePlayer ? activePlayer.name : 'dostum';
@@ -82,6 +85,7 @@ export const WhatsAppInviteModal: React.FC<WhatsAppInviteModalProps> = ({ player
 
 Selam *${name}*, ${dayName} günü saat ${timeOnly}'de maç kadrosuna çağrıldın! 🔥
 📍 *Saha:* ${currentMatch.venueName}
+🗺️ *Konum (Google Maps):* ${mapsUrl}
 💰 *Ücret:* ${feeText}
 
 Lütfen katılım durumunu aşağıdaki linke dokunarak tek tıkla bildir:
@@ -102,6 +106,7 @@ ${linkKadro}`;
 
 Selam *${name}*, yarın saat ${timeOnly}'de halı saha maçımız var, unutmadın değil mi? ⚽🔥
 📍 *Saha:* ${currentMatch.venueName}
+🗺️ *Konum (Google Maps):* ${mapsUrl}
 💰 *Ücret:* ${feeText}
 
 Kadro netleştiriliyor. Katılımını tek tıkla onayla:
@@ -119,14 +124,16 @@ Kurtarıcımız olursun! Kadroya girmek için hemen tıkla:
 ✅ *GELİYORUM (KADROYA GİR):* ${linkYes}
 ❌ *GELEMİYORUM:* ${linkNo}
 
-📍 *Saha:* ${currentMatch.venueName}`;
+📍 *Saha:* ${currentMatch.venueName}
+🗺️ *Konum (Google Maps):* ${mapsUrl}`;
     }
 
     // 4. Short and sweet
     return `Selam *${name}*, ${dayName} günü saat ${timeOnly}'de maçımız var, gelmek ister misin? ⚽🔥
-Saha: ${currentMatch.venueName}
+📍 Saha: ${currentMatch.venueName}
+🗺️ Konum: ${mapsUrl}
 Tek tıkla onayla: ${linkYes}`;
-  }, [templateType, activePlayer, dayName, timeOnly, feeText, linkYes, linkNo, linkKadro, currentMatch]);
+  }, [templateType, activePlayer, dayName, timeOnly, feeText, linkYes, linkNo, linkKadro, currentMatch, mapsUrl]);
 
   // Handle active message (custom or generated)
   const messageToSend = customMessage.trim() ? customMessage : generatedText;

@@ -1,5 +1,6 @@
 import { Position, Player, Team, TeamPlayer, AttendanceStatus, Match } from '../types';
 import { POSITION_WEIGHTS, COUNCIL_MEMBERS } from '../data/initialData';
+import { getMatchMapsUrl } from '../services/firebase';
 
 /**
  * Calculates a player's rating for a specific position given a criterion score map
@@ -349,10 +350,12 @@ export function generateWhatsAppShareText(match: Match, playersMap: Record<strin
     day: 'numeric',
     month: 'long',
   });
+  const mapsUrl = getMatchMapsUrl(match);
 
   let text = `⚽ *${match.matchNumber}. HAFTA HALI SAHA MAÇ KADROSU* ⚽\n`;
   text += `📅 Tarih: ${dateFormatted} | ${match.time}\n`;
-  text += `📍 Saha: ${match.venueName} (${match.pitchNo})\n`;
+  text += `📍 Saha: ${match.venueName}\n`;
+  text += `🗺️ Konum (Google Maps): ${mapsUrl}\n`;
   text += `💰 Ücret: ${match.totalPitchCost} ₺ (Kişi Başı: ${match.costPerPlayer} ₺)\n\n`;
 
   text += `🔴 *${match.teamA.name.toUpperCase()} (Güç: ${match.teamA.totalPower})*\n`;
