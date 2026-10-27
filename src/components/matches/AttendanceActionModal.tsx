@@ -293,28 +293,49 @@ export const AttendanceActionModal: React.FC = () => {
               </p>
             </div>
 
-            {isCouncil ? (
-              <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-2xl text-left text-xs space-y-2">
-                <div className="flex items-center space-x-2 text-slate-200">
-                  <Calendar className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span className="font-bold capitalize">{dateFormatted}</span>
+            <div className="p-3.5 bg-slate-950/90 border border-slate-800 rounded-2xl text-left text-xs space-y-2.5 shadow-inner">
+              <div className="flex items-center space-x-2.5 text-slate-200">
+                <Calendar className="w-4 h-4 text-emerald-400 shrink-0" />
+                <div>
+                  <span className="text-[10px] text-slate-400 block">Maç Tarihi & Günü</span>
+                  <span className="font-bold text-white capitalize">{dateFormatted}</span>
                 </div>
-                <div className="flex items-center space-x-2 text-slate-300">
-                  <Clock className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Saat: <strong className="text-white">{currentMatch.time}</strong></span>
+              </div>
+
+              <div className="flex items-center space-x-2.5 text-slate-200">
+                <Clock className="w-4 h-4 text-emerald-400 shrink-0" />
+                <div>
+                  <span className="text-[10px] text-slate-400 block">Maç Saati</span>
+                  <span className="font-bold text-emerald-300">{currentMatch.time}</span>
                 </div>
-                <div className="flex items-center justify-between gap-2 pt-0.5">
-                  <div className="flex items-center space-x-2 text-slate-200 min-w-0">
-                    <MapPin className="w-4 h-4 text-rose-400 shrink-0" />
+              </div>
+
+              <div className="pt-1 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                <div className="flex items-start space-x-2.5 text-slate-200 min-w-0">
+                  <MapPin className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <span className="text-[10px] text-slate-400 block">Saha / Tesis & Konum</span>
                     <span className="font-bold text-white block truncate">{currentMatch.venueName}</span>
+                    {currentMatch.venueLocation && currentMatch.venueLocation !== currentMatch.venueName && (
+                      <span className="text-[10px] text-slate-400 block truncate mt-0.5">
+                        {currentMatch.venueLocation}
+                      </span>
+                    )}
                   </div>
                 </div>
+
+                <a
+                  href={getMatchMapsUrl(currentMatch)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1.5 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/40 text-blue-300 text-[11px] font-bold flex items-center space-x-1 shrink-0 transition-all active:scale-95"
+                >
+                  <Navigation className="w-3 h-3 text-blue-400" />
+                  <span>Konum</span>
+                  <ExternalLink className="w-2.5 h-2.5" />
+                </a>
               </div>
-            ) : (
-              <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-2xl text-xs text-slate-400">
-                🔒 Maça <strong className="text-emerald-400">"Geliyorum"</strong> olarak onay verdiğinizde maç saati, saha konumu ve kadro detayları ekranınızda açılacaktır.
-              </div>
-            )}
+            </div>
 
             {/* Action Buttons */}
             <div className="space-y-2 pt-1">

@@ -35,7 +35,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab })
       badgeColor: 'bg-rose-500',
       councilOnly: true,
     },
-    { id: 'rules' as TabType, label: 'Konsey', icon: BookOpen, councilOnly: false },
+    { id: 'rules' as TabType, label: 'Konsey', icon: BookOpen, councilOnly: true },
   ];
 
   const tabs = isCouncil ? allTabs : allTabs.filter(t => !t.councilOnly);
@@ -44,7 +44,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab })
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-xl border-t border-slate-800 pb-safe md:hidden">
       <div
         className={`w-full max-w-2xl lg:max-w-3xl mx-auto grid ${
-          isCouncil ? 'grid-cols-5' : 'grid-cols-3'
+          isCouncil ? 'grid-cols-5' : 'grid-cols-2'
         } h-16 px-2 sm:px-4`}
       >
         {tabs.map(tab => {

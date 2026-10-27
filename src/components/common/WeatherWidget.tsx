@@ -19,12 +19,14 @@ interface WeatherWidgetProps {
   matchDate?: string;
   matchTime?: string;
   venueName?: string;
+  venueLocation?: string;
 }
 
 export const WeatherWidget: React.FC<WeatherWidgetProps> = ({
   matchDate,
   matchTime,
   venueName,
+  venueLocation,
 }) => {
   const [weather, setWeather] = useState<MatchWeather | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -33,11 +35,12 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({
     setIsLoading(true);
     try {
       const data = await fetchLiveWeather(
-        venueName || 'İstanbul / Gebze',
-        40.80,
-        29.43,
+        venueName || 'Olimpiyat Halı Saha Tesisleri',
+        41.01,
+        28.97,
         matchDate,
-        matchTime
+        matchTime,
+        venueLocation
       );
       setWeather(data);
     } finally {
@@ -47,7 +50,7 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({
 
   useEffect(() => {
     loadWeather();
-  }, [matchDate, matchTime, venueName]);
+  }, [matchDate, matchTime, venueName, venueLocation]);
 
   const renderWeatherIcon = (iconName: string) => {
     switch (iconName) {

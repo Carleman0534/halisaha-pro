@@ -101,7 +101,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badgeColor: 'bg-rose-500',
       councilOnly: true,
     },
-    { id: 'rules' as TabType, label: 'Konsey Kuralları', icon: BookOpen, councilOnly: false },
+    { id: 'rules' as TabType, label: 'Konsey Kuralları', icon: BookOpen, councilOnly: true },
   ];
 
   const navTabs = isCouncil ? allNavTabs : allNavTabs.filter(t => !t.councilOnly);

@@ -792,6 +792,7 @@ ${generalDecline}
         matchDate={currentMatch.date}
         matchTime={currentMatch.time}
         venueName={currentMatch.venueName}
+        venueLocation={currentMatch.venueLocation}
       />
 
       {/* 2. 1 GÜN ÖNCE MAÇ TEYİT & BİLDİRİM SİSTEMİ (H-24) — Sadece Konsey/Yönetici */}

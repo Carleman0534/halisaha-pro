@@ -17,9 +17,9 @@ const MainLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('matches');
   const [showFirebaseModal, setShowFirebaseModal] = useState(false);
 
-  // If user switches to a non-council role while on a restricted tab ('finance' or 'players'), redirect to 'matches'
+  // If user switches to a non-council role while on a restricted tab ('finance', 'players', or 'rules'), redirect to 'matches'
   useEffect(() => {
-    if (!isCouncil && (activeTab === 'finance' || activeTab === 'players')) {
+    if (!isCouncil && (activeTab === 'finance' || activeTab === 'players' || activeTab === 'rules')) {
       setActiveTab('matches');
     }
   }, [isCouncil, activeTab]);
@@ -42,13 +42,13 @@ const MainLayout: React.FC = () => {
           {/* PWA Install Banner */}
           <PwaInstallPrompt />
 
-          {(activeTab === 'matches' || (!isCouncil && (activeTab === 'players' || activeTab === 'finance'))) && (
+          {(activeTab === 'matches' || (!isCouncil && (activeTab === 'players' || activeTab === 'finance' || activeTab === 'rules'))) && (
             <MatchPlanner onNavigateToSquad={() => setActiveTab('squad')} />
           )}
           {activeTab === 'squad' && <SquadManager />}
           {isCouncil && activeTab === 'players' && <PlayerPool />}
           {isCouncil && activeTab === 'finance' && <FinanceManager />}
-          {activeTab === 'rules' && <CouncilRules />}
+          {isCouncil && activeTab === 'rules' && <CouncilRules />}
         </div>
       </main>
 
