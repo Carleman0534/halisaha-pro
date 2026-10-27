@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useApp } from '../../context/AppContext';
-import { isPlayerExemptForMatch } from '../../utils/permissions';
+import { isPlayerExemptForMatch, hasActiveMatchInvitation } from '../../utils/permissions';
 import { getMatchMapsUrl } from '../../services/firebase';
 import { getNotificationPermission, requestNotificationPermission } from '../../services/notifications';
 
@@ -76,9 +76,7 @@ export const PlayerAttendanceConfirmCard: React.FC<PlayerAttendanceConfirmCardPr
   const status = currentMatch.attendance[myId] || 'Haber Bekleniyor';
   const isComing = status === 'Geliyor' || status === 'Geldi';
   const isNotComing = status === 'Gelemiyor' || status === 'Gelmedi';
-  const isPending = status === 'Haber Bekleniyor' || status === 'Beklemede';
-  const req = currentMatch.attendanceRequests?.[myId];
-  const hasPendingInvite = !!(req && req.status === 'pending' && isPending);
+  const hasPendingInvite = hasActiveMatchInvitation(myId, currentMatch);
   const isPaid = !!currentMatch.payments[myId]?.isPaid;
   const exemptionInfo = isPlayerExemptForMatch(player, currentMatch);
   const isExempt = exemptionInfo.isExempt;

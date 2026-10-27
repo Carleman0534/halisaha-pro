@@ -18,15 +18,19 @@ const STORAGE_KEY_EXEMPTION_LOGS = 'halisaha_local_exemption_audit_logs';
 const STORAGE_KEY_NOTIFICATION_LOGS = 'halisaha_local_notification_dispatch_logs';
 const STORAGE_KEY_VENUES = 'halisaha_local_venues';
 const STORAGE_KEY_INVITES = 'halisaha_local_attendance_requests';
+const STORAGE_KEY_INVITES_GLOBAL = 'halisaha_local_attendance_requests_global';
 
-// Zero-config realtime cloud sync channel (ensures all accounts/devices see the exact same match & venues)
+// Zero-config realtime cloud sync channels
 const CLOUD_SYNC_TOPIC = 'halisaha_pro_carleman0534_sync_v2';
 const CLOUD_SYNC_URL = `https://ntfy.sh/${CLOUD_SYNC_TOPIC}`;
+const CLOUD_INVITE_TOPIC = 'halisaha_pro_invites_v3';
+const CLOUD_INVITE_URL = `https://ntfy.sh/${CLOUD_INVITE_TOPIC}`;
 const CLIENT_INSTANCE_ID = `cli_${Math.random().toString(36).slice(2, 10)}`;
 
 let firestoreInstance: Firestore | null = null;
 let appInstance: FirebaseApp | null = null;
 let lastCloudFetchTime = 0;
+let pushDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 // Strip undefined properties recursively so Firestore setDoc never throws Unsupported field value: undefined
 function stripUndefined<T>(obj: T): T {
@@ -37,12 +41,24 @@ function stripUndefined<T>(obj: T): T {
   }
 }
 
+function getEffectiveInviteTime(
+  req?: NonNullable<Match['attendanceRequests']>[string]
+): number {
+  if (!req) return 0;
+  const reqTs = req.requestedAt ? Date.parse(req.requestedAt) || 0 : 0;
+  const respTs = req.respondedAt ? Date.parse(req.respondedAt) || 0 : 0;
+  return req.status === 'pending' ? reqTs : Math.max(reqTs, respTs);
+}
+
 export function getSavedAttendanceRequests(
-  matchId: string
+  matchId?: string
 ): NonNullable<Match['attendanceRequests']> {
   try {
-    const raw = localStorage.getItem(`${STORAGE_KEY_INVITES}_${matchId}`);
-    return raw ? JSON.parse(raw) : {};
+    const globalRaw = localStorage.getItem(STORAGE_KEY_INVITES_GLOBAL);
+    const globalReqs = globalRaw ? JSON.parse(globalRaw) : {};
+    const matchRaw = matchId ? localStorage.getItem(`${STORAGE_KEY_INVITES}_${matchId}`) : null;
+    const matchReqs = matchRaw ? JSON.parse(matchRaw) : {};
+    return { ...globalReqs, ...matchReqs };
   } catch {
     return {};
   }
@@ -52,12 +68,22 @@ export function saveAttendanceRequestsLocal(
   matchId: string,
   requests?: Match['attendanceRequests']
 ): void {
-  if (!matchId || !requests) return;
+  if (!requests) return;
   try {
-    localStorage.setItem(
-      `${STORAGE_KEY_INVITES}_${matchId}`,
-      JSON.stringify(stripUndefined(requests))
-    );
+    const clean = stripUndefined(requests);
+    if (matchId) {
+      localStorage.setItem(`${STORAGE_KEY_INVITES}_${matchId}`, JSON.stringify(clean));
+    }
+    const existingGlobal = getSavedAttendanceRequests();
+    const mergedGlobal = { ...existingGlobal };
+    Object.entries(clean).forEach(([pid, r]) => {
+      if (!r) return;
+      const prev = mergedGlobal[pid];
+      if (!prev || getEffectiveInviteTime(r) >= getEffectiveInviteTime(prev)) {
+        mergedGlobal[pid] = r;
+      }
+    });
+    localStorage.setItem(STORAGE_KEY_INVITES_GLOBAL, JSON.stringify(mergedGlobal));
   } catch {}
 }
 
@@ -66,12 +92,17 @@ export function mergeMatchWithSavedInvites(incoming: Match): Match {
   if (!incoming || !incoming.id) return incoming;
   const savedReqs = getSavedAttendanceRequests(incoming.id);
   let currentLocalReqs: NonNullable<Match['attendanceRequests']> = {};
+  let currentLocalAttendance: Match['attendance'] = {};
+  let currentLocalTimestamps: NonNullable<Match['attendanceTimestamps']> = {};
+
   try {
     const rawCurrent = localStorage.getItem(STORAGE_KEY_MATCH);
     if (rawCurrent) {
       const parsedCurrent = JSON.parse(rawCurrent) as Match;
-      if (parsedCurrent && parsedCurrent.id === incoming.id && parsedCurrent.attendanceRequests) {
-        currentLocalReqs = parsedCurrent.attendanceRequests;
+      if (parsedCurrent && parsedCurrent.id === incoming.id) {
+        currentLocalReqs = parsedCurrent.attendanceRequests || {};
+        currentLocalAttendance = parsedCurrent.attendance || {};
+        currentLocalTimestamps = parsedCurrent.attendanceTimestamps || {};
       }
     }
   } catch {}
@@ -82,13 +113,22 @@ export function mergeMatchWithSavedInvites(incoming: Match): Match {
     ...(incoming.attendanceRequests || {}),
   };
 
+  const mergedAttendance: Match['attendance'] = {
+    ...currentLocalAttendance,
+    ...(incoming.attendance || {}),
+  };
+
+  const mergedTimestamps: NonNullable<Match['attendanceTimestamps']> = {
+    ...currentLocalTimestamps,
+    ...(incoming.attendanceTimestamps || {}),
+  };
+
   const allPlayerIds = new Set([
     ...Object.keys(savedReqs),
     ...Object.keys(currentLocalReqs),
     ...Object.keys(incoming.attendanceRequests || {}),
+    ...Object.keys(mergedAttendance),
   ]);
-
-  const mergedAttendance = { ...(incoming.attendance || {}) };
 
   allPlayerIds.forEach(pid => {
     const rSaved = savedReqs[pid];
@@ -98,31 +138,37 @@ export function mergeMatchWithSavedInvites(incoming: Match): Match {
     const candidates = [rSaved, rLocal, rInc].filter(Boolean) as NonNullable<
       Match['attendanceRequests']
     >[string][];
-    if (candidates.length === 0) return;
 
-    // Pick the candidate with the newest activity timestamp (requestedAt or respondedAt)
-    candidates.sort((a, b) => {
-      const tA = Math.max(
-        a.requestedAt ? Date.parse(a.requestedAt) || 0 : 0,
-        a.respondedAt ? Date.parse(a.respondedAt) || 0 : 0
-      );
-      const tB = Math.max(
-        b.requestedAt ? Date.parse(b.requestedAt) || 0 : 0,
-        b.respondedAt ? Date.parse(b.respondedAt) || 0 : 0
-      );
-      return tB - tA;
-    });
+    if (candidates.length > 0) {
+      candidates.sort((a, b) => getEffectiveInviteTime(b) - getEffectiveInviteTime(a));
+      const winner = { ...candidates[0] };
 
-    const winner = candidates[0];
-    mergedRequests[pid] = winner;
-
-    // If the newest state for this player is a pending invite, ensure their attendance reflects 'Haber Bekleniyor'
-    if (winner.status === 'pending') {
-      const incStatus = mergedAttendance[pid];
+      // Check if player was explicitly set to 'Haber Bekleniyor' more recently than winner.respondedAt
+      const attTsStr = incoming.attendanceTimestamps?.[pid] || currentLocalTimestamps[pid];
+      const attTs = attTsStr ? Date.parse(attTsStr) || 0 : 0;
       const respTs = winner.respondedAt ? Date.parse(winner.respondedAt) || 0 : 0;
-      const reqTs = winner.requestedAt ? Date.parse(winner.requestedAt) || 0 : 0;
-      if (reqTs > respTs || !incStatus) {
-        mergedAttendance[pid] = 'Haber Bekleniyor';
+      const currentStatus = incoming.attendance?.[pid] || currentLocalAttendance[pid];
+
+      if (
+        winner.status === 'responded' &&
+        (currentStatus === 'Haber Bekleniyor' || currentStatus === 'Beklemede') &&
+        attTs > respTs
+      ) {
+        winner.status = 'pending';
+        winner.requestedAt = attTsStr!;
+        delete winner.respondedAt;
+      }
+
+      mergedRequests[pid] = winner;
+
+      if (winner.status === 'pending') {
+        const reqTs = winner.requestedAt ? Date.parse(winner.requestedAt) || 0 : 0;
+        if (reqTs >= attTs || !currentStatus || currentStatus === 'Haber Bekleniyor' || currentStatus === 'Beklemede') {
+          mergedAttendance[pid] = 'Haber Bekleniyor';
+          if (winner.requestedAt) {
+            mergedTimestamps[pid] = winner.requestedAt;
+          }
+        }
       }
     }
   });
@@ -132,8 +178,36 @@ export function mergeMatchWithSavedInvites(incoming: Match): Match {
   return {
     ...incoming,
     attendance: mergedAttendance,
+    attendanceTimestamps: mergedTimestamps,
     attendanceRequests: mergedRequests,
   };
+}
+
+function shouldAcceptIncomingMatch(incoming: Match, incomingTs: number): boolean {
+  try {
+    const rawLocal = localStorage.getItem(STORAGE_KEY_MATCH);
+    if (!rawLocal) return true;
+    const localMatch = JSON.parse(rawLocal) as Match;
+    if (!localMatch || !localMatch.id) return true;
+
+    const localIsDefault = localMatch.id === 'match_current' && (localMatch.matchNumber || 44) <= 44;
+    const incIsDefault = incoming.id === 'match_current' && (incoming.matchNumber || 44) <= 44;
+
+    // Never let a default initial match (Week 44) overwrite a newly created match (e.g. Week 46)
+    if (!localIsDefault && incIsDefault) {
+      return false;
+    }
+    if (localIsDefault && !incIsDefault) {
+      return true;
+    }
+    if ((incoming.matchNumber || 0) > (localMatch.matchNumber || 0)) {
+      return true;
+    }
+    if ((incoming.matchNumber || 0) < (localMatch.matchNumber || 0)) {
+      return false;
+    }
+  } catch {}
+  return incomingTs >= getLocalMatchTimestamp();
 }
 
 export function getLocalMatchTimestamp(): number {
@@ -194,44 +268,168 @@ function buildCompactMatchForCloud(match: Match): Match {
   });
 }
 
+// Instant dedicated broadcast for "🔔 Sor" player invitations & responses
+export async function pushPlayerInviteToCloud(
+  match: Match,
+  playerId: string,
+  requestedBy: string,
+  requestedAt: string,
+  status: 'pending' | 'responded' = 'pending',
+  responseStatus?: string
+): Promise<void> {
+  const invitePacket = stripUndefined({
+    t: 'player_invite',
+    sid: CLIENT_INSTANCE_ID,
+    ts: Date.now(),
+    playerId,
+    requestedAt,
+    requestedBy,
+    status,
+    ...(status === 'responded' ? { respondedAt: requestedAt, responseStatus } : {}),
+    matchId: match.id,
+    matchNumber: match.matchNumber,
+    date: match.date,
+    time: match.time,
+    venueName: match.venueName,
+    venueLocation: match.venueLocation || match.venueName,
+    venueMapsUrl: match.venueMapsUrl,
+    costPerPlayer: match.costPerPlayer,
+  });
+
+  // 1. Same-origin Vercel Serverless Sync Store (0 rate limit)
+  fetch('/api/sync', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      invite: invitePacket,
+      match: buildCompactMatchForCloud(match),
+    }),
+  }).catch(() => {});
+
+  // 2. Dedicated lightweight invite SSE channel (~220 bytes)
+  fetch(CLOUD_INVITE_URL, {
+    method: 'POST',
+    body: JSON.stringify(invitePacket),
+  }).catch(() => {});
+}
+
 export async function pushMatchToCloudSync(match: Match, ts: number): Promise<void> {
-  try {
+  const compact = buildCompactMatchForCloud(match);
+
+  // 1. Immediate push to same-origin Vercel API (/api/sync) - never rate-limited
+  fetch('/api/sync', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ts,
+      match: compact,
+      invites: compact.attendanceRequests || {},
+    }),
+  }).catch(() => {});
+
+  // 2. Debounced push to ntfy.sh so rapid button clicks never trigger HTTP 429
+  if (pushDebounceTimer) {
+    clearTimeout(pushDebounceTimer);
+  }
+  pushDebounceTimer = setTimeout(() => {
     const payload = JSON.stringify({
       t: 'match_sync',
       ts,
       sid: CLIENT_INSTANCE_ID,
-      match: buildCompactMatchForCloud(match),
+      match: compact,
     });
-
-    // Use a simple POST without custom headers so browsers send a direct request without CORS preflight
-    await fetch(CLOUD_SYNC_URL, {
+    fetch(CLOUD_SYNC_URL, {
       method: 'POST',
       body: payload,
-    });
-  } catch {
-    // Offline or blocked; local storage still works seamlessly
-  }
+    }).catch(() => {});
+  }, 600);
 }
 
 export async function fetchLatestMatchFromCloudSync(
   force: boolean = false
 ): Promise<{ match: Match; ts: number } | null> {
   try {
+    // 1. Always try fast same-origin Vercel API (/api/sync) first (zero rate limits!)
+    try {
+      const apiRes = await fetch(`/api/sync?t=${Date.now()}`, {
+        cache: 'no-store',
+      });
+      if (apiRes.ok) {
+        const apiData = await apiRes.json();
+        if (apiData && apiData.invites) {
+          saveAttendanceRequestsLocal(apiData.match?.id || 'match_current', apiData.invites);
+        }
+        if (apiData && apiData.match && apiData.match.id) {
+          return {
+            match: mergeMatchWithSavedInvites(apiData.match as Match),
+            ts: Number(apiData.ts) || Date.now(),
+          };
+        }
+      }
+    } catch {}
+
+    // 2. Also check lightweight invite channel & ntfy sync channel (throttled to avoid 429)
     const now = Date.now();
-    if (!force && now - lastCloudFetchTime < 12000) {
+    if (!force && now - lastCloudFetchTime < 10000) {
       return null;
     }
     lastCloudFetchTime = now;
 
+    // Fetch lightweight invites first
+    try {
+      const invRes = await fetch(`${CLOUD_INVITE_URL}/json?poll=1&since=24h`, {
+        cache: 'no-store',
+      });
+      if (invRes.ok) {
+        const invText = await invRes.text();
+        if (invText.trim()) {
+          const invLines = invText.trim().split('\n');
+          const collectedInvites: NonNullable<Match['attendanceRequests']> = {};
+          for (const line of invLines) {
+            try {
+              const env = JSON.parse(line);
+              if (env && typeof env.message === 'string') {
+                const p = JSON.parse(env.message);
+                if (p && p.t === 'player_invite' && p.playerId && p.requestedAt) {
+                  const candidate = {
+                    playerId: p.playerId,
+                    requestedAt: p.requestedAt,
+                    requestedBy: p.requestedBy || 'Konsey',
+                    status: (p.status === 'responded' ? 'responded' : 'pending') as 'pending' | 'responded',
+                    ...(p.respondedAt ? { respondedAt: p.respondedAt } : {}),
+                  };
+                  const prev = collectedInvites[p.playerId];
+                  if (!prev || getEffectiveInviteTime(candidate) >= getEffectiveInviteTime(prev)) {
+                    collectedInvites[p.playerId] = candidate;
+                  }
+                }
+              }
+            } catch {}
+          }
+          if (Object.keys(collectedInvites).length > 0) {
+            saveAttendanceRequestsLocal('global', collectedInvites);
+          }
+        }
+      }
+    } catch {}
+
     const res = await fetch(`${CLOUD_SYNC_URL}/json?poll=1&since=12h`, {
       cache: 'no-store',
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const rawLocal = localStorage.getItem(STORAGE_KEY_MATCH);
+      if (rawLocal) {
+        const mergedLocal = mergeMatchWithSavedInvites(JSON.parse(rawLocal) as Match);
+        return { match: mergedLocal, ts: Date.now() };
+      }
+      return null;
+    }
     const text = await res.text();
     if (!text.trim()) return null;
 
     const lines = text.trim().split('\n');
     let latest: { match: Match; ts: number } | null = null;
+    const streamInvites: NonNullable<Match['attendanceRequests']> = {};
 
     for (const line of lines) {
       try {
@@ -239,13 +437,42 @@ export async function fetchLatestMatchFromCloudSync(
         if (envelope && envelope.event === 'message' && typeof envelope.message === 'string') {
           const parsed = JSON.parse(envelope.message);
           if (parsed && parsed.t === 'match_sync' && parsed.match && parsed.match.id) {
-            const msgTs = Number(parsed.ts) || (envelope.time ? envelope.time * 1000 : 0);
-            if (!latest || msgTs >= latest.ts) {
-              latest = { match: mergeMatchWithSavedInvites(parsed.match as Match), ts: msgTs };
+            const incomingMatch = parsed.match as Match;
+            if (incomingMatch.attendanceRequests) {
+              Object.entries(incomingMatch.attendanceRequests).forEach(([pid, r]) => {
+                if (!r) return;
+                const prev = streamInvites[pid];
+                if (!prev || getEffectiveInviteTime(r) >= getEffectiveInviteTime(prev)) {
+                  streamInvites[pid] = r;
+                }
+              });
+            }
+            const serverTs = envelope.time ? envelope.time * 1000 : Number(parsed.ts) || 0;
+            if (!latest) {
+              latest = { match: incomingMatch, ts: serverTs };
+            } else {
+              const curIsDefault = latest.match.id === 'match_current' && (latest.match.matchNumber || 44) <= 44;
+              const incIsDefault = incomingMatch.id === 'match_current' && (incomingMatch.matchNumber || 44) <= 44;
+              if (
+                (curIsDefault && !incIsDefault) ||
+                (! (!curIsDefault && incIsDefault) &&
+                  ((incomingMatch.matchNumber || 0) > (latest.match.matchNumber || 0) ||
+                    ((incomingMatch.matchNumber || 0) === (latest.match.matchNumber || 0) && serverTs >= latest.ts)))
+              ) {
+                latest = { match: incomingMatch, ts: serverTs };
+              }
             }
           }
         }
       } catch {}
+    }
+
+    if (Object.keys(streamInvites).length > 0) {
+      saveAttendanceRequestsLocal(latest?.match?.id || 'global', streamInvites);
+    }
+
+    if (latest) {
+      latest.match = mergeMatchWithSavedInvites(latest.match);
     }
 
     return latest;
@@ -392,11 +619,32 @@ export function subscribeToMatchUpdates(
   let unsubscribeFirestore: (() => void) | null = null;
   let unsubscribeActiveMatch: (() => void) | null = null;
   let eventSource: EventSource | null = null;
+  let inviteEventSource: EventSource | null = null;
   let pollInterval: ReturnType<typeof setInterval> | null = null;
   let isActive = true;
 
   const applyIncomingMatch = (incoming: Match, incomingTs?: number) => {
-    const merged = mergeMatchWithSavedInvites(incoming);
+    let baseMatch = incoming;
+    try {
+      const rawLocal = localStorage.getItem(STORAGE_KEY_MATCH);
+      if (rawLocal) {
+        const localMatch = JSON.parse(rawLocal) as Match;
+        if (localMatch && localMatch.id) {
+          if (!shouldAcceptIncomingMatch(incoming, incomingTs || Date.now())) {
+            // Keep the newer local match structure, but merge any new attendanceRequests from incoming!
+            baseMatch = {
+              ...localMatch,
+              attendanceRequests: {
+                ...(localMatch.attendanceRequests || {}),
+                ...(incoming.attendanceRequests || {}),
+              },
+            };
+          }
+        }
+      }
+    } catch {}
+
+    const merged = mergeMatchWithSavedInvites(baseMatch);
     localStorage.setItem(STORAGE_KEY_MATCH, JSON.stringify(merged));
     if (typeof incomingTs === 'number' && incomingTs > getLocalMatchTimestamp()) {
       setLocalMatchTimestamp(incomingTs);
@@ -404,15 +652,78 @@ export function subscribeToMatchUpdates(
     onUpdate(merged);
   };
 
+  const applyInvitePacket = (p: Record<string, any>) => {
+    if (!p || !p.playerId || !p.requestedAt) return;
+    const candidate = {
+      playerId: String(p.playerId),
+      requestedAt: String(p.requestedAt),
+      requestedBy: String(p.requestedBy || 'Konsey'),
+      status: (p.status === 'responded' ? 'responded' : 'pending') as 'pending' | 'responded',
+      ...(p.respondedAt ? { respondedAt: String(p.respondedAt) } : {}),
+    };
+
+    saveAttendanceRequestsLocal(p.matchId || matchId || 'global', {
+      [candidate.playerId]: candidate,
+    });
+
+    try {
+      const rawLocal = localStorage.getItem(STORAGE_KEY_MATCH);
+      if (rawLocal) {
+        const localMatch = JSON.parse(rawLocal) as Match;
+        const updatedMatch: Match = {
+          ...localMatch,
+          ...(p.date ? { date: p.date } : {}),
+          ...(p.time ? { time: p.time } : {}),
+          ...(p.venueName ? { venueName: p.venueName } : {}),
+          ...(p.venueLocation ? { venueLocation: p.venueLocation } : {}),
+          ...(p.venueMapsUrl ? { venueMapsUrl: p.venueMapsUrl } : {}),
+          ...(typeof p.costPerPlayer === 'number' ? { costPerPlayer: p.costPerPlayer } : {}),
+          ...(typeof p.matchNumber === 'number' && p.matchNumber >= (localMatch.matchNumber || 0)
+            ? { matchNumber: p.matchNumber }
+            : {}),
+          attendance: {
+            ...(localMatch.attendance || {}),
+            [candidate.playerId]:
+              candidate.status === 'pending'
+                ? 'Haber Bekleniyor'
+                : p.responseStatus || localMatch.attendance?.[candidate.playerId] || 'Haber Bekleniyor',
+          },
+          attendanceTimestamps: {
+            ...(localMatch.attendanceTimestamps || {}),
+            [candidate.playerId]: candidate.respondedAt || candidate.requestedAt,
+          },
+          attendanceRequests: {
+            ...(localMatch.attendanceRequests || {}),
+            [candidate.playerId]: candidate,
+          },
+        };
+        const merged = mergeMatchWithSavedInvites(updatedMatch);
+        localStorage.setItem(STORAGE_KEY_MATCH, JSON.stringify(merged));
+        onUpdate(merged);
+      }
+    } catch {}
+  };
+
   const checkCloudSync = () => {
     if (!isActive) return;
     fetchLatestMatchFromCloudSync().then(cloudData => {
       if (!isActive || !cloudData || !cloudData.match) return;
-      const localTs = getLocalMatchTimestamp();
-      if (cloudData.ts >= localTs) {
-        applyIncomingMatch(cloudData.match, cloudData.ts);
-      }
+      applyIncomingMatch(cloudData.match, cloudData.ts);
     });
+  };
+
+  const checkCloudSyncForced = () => {
+    if (!isActive) return;
+    fetchLatestMatchFromCloudSync(true).then(cloudData => {
+      if (!isActive || !cloudData || !cloudData.match) return;
+      applyIncomingMatch(cloudData.match, cloudData.ts);
+    });
+  };
+
+  const handleVisibilityChange = () => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+      checkCloudSyncForced();
+    }
   };
 
   // 1. Initial Cloud Sync check on mount / user switch
@@ -420,10 +731,9 @@ export function subscribeToMatchUpdates(
     if (!isActive) return;
     const localTs = getLocalMatchTimestamp();
 
-    if (cloudData && cloudData.match && cloudData.ts >= localTs) {
+    if (cloudData && cloudData.match) {
       applyIncomingMatch(cloudData.match, cloudData.ts);
     } else if (!cloudData && localTs > 0) {
-      // Only push local match if we genuinely have a newer local write timestamp
       try {
         const rawLocal = localStorage.getItem(STORAGE_KEY_MATCH);
         if (rawLocal) {
@@ -434,14 +744,31 @@ export function subscribeToMatchUpdates(
     }
   });
 
-  // Periodic poll & focus sync so mobile browsers never miss an incoming "🔔 Sor" notification
+  // Fast 3.5-second poll via same-origin /api/sync & visibility/focus sync for mobile
   if (typeof window !== 'undefined') {
-    pollInterval = setInterval(checkCloudSync, 15000);
-    window.addEventListener('focus', checkCloudSync);
+    pollInterval = setInterval(checkCloudSync, 3500);
+    window.addEventListener('focus', checkCloudSyncForced);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
   }
 
-  // 2. Live Server-Sent Events (SSE) subscription for real-time cross-device updates
+  // 2. Live Server-Sent Events (SSE) subscription for real-time cross-device updates & invites
   if (typeof window !== 'undefined' && typeof EventSource !== 'undefined') {
+    try {
+      inviteEventSource = new EventSource(`${CLOUD_INVITE_URL}/sse`);
+      inviteEventSource.onmessage = event => {
+        if (!isActive || !event.data) return;
+        try {
+          const envelope = JSON.parse(event.data);
+          if (envelope && typeof envelope.message === 'string') {
+            const parsed = JSON.parse(envelope.message);
+            if (parsed && parsed.t === 'player_invite' && parsed.playerId) {
+              applyInvitePacket(parsed);
+            }
+          }
+        } catch {}
+      };
+    } catch {}
+
     try {
       eventSource = new EventSource(`${CLOUD_SYNC_URL}/sse`);
       eventSource.onmessage = event => {
@@ -457,10 +784,8 @@ export function subscribeToMatchUpdates(
               parsed.match &&
               parsed.match.id
             ) {
-              const incomingTs = Number(parsed.ts) || Date.now();
-              if (incomingTs >= getLocalMatchTimestamp()) {
-                applyIncomingMatch(parsed.match as Match, incomingTs);
-              }
+              const incomingTs = envelope.time ? envelope.time * 1000 : Number(parsed.ts) || Date.now();
+              applyIncomingMatch(parsed.match as Match, incomingTs);
             }
           }
         } catch {}
@@ -528,6 +853,11 @@ export function subscribeToMatchUpdates(
     if (pollInterval) {
       clearInterval(pollInterval);
     }
+    if (inviteEventSource) {
+      try {
+        inviteEventSource.close();
+      } catch {}
+    }
     if (eventSource) {
       try {
         eventSource.close();
@@ -536,7 +866,8 @@ export function subscribeToMatchUpdates(
     if (unsubscribeActiveMatch) unsubscribeActiveMatch();
     if (unsubscribeFirestore) unsubscribeFirestore();
     if (typeof window !== 'undefined') {
-      window.removeEventListener('focus', checkCloudSync);
+      window.removeEventListener('focus', checkCloudSyncForced);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('storage', handleStorageEvent);
     }
   };

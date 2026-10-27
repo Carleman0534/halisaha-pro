@@ -34,6 +34,7 @@ import { useApp } from '../../context/AppContext';
 import { Player, AttendanceStatus, Position } from '../../types';
 import { sendOneDayBeforeReminder } from '../../services/notifications';
 import { getMatchMapsUrl } from '../../services/firebase';
+import { hasActiveMatchInvitation } from '../../utils/permissions';
 import { AddToCalendarModal } from '../common/AddToCalendarModal';
 import { EditMatchModal } from './EditMatchModal';
 import { VenueManagerModal } from './VenueManagerModal';
@@ -133,6 +134,11 @@ export const EmergencySubstituteFinder: React.FC<EmergencySubstituteFinderProps>
         player,
         message: res.message,
       });
+      if (player.id === currentUser.playerId) {
+        window.dispatchEvent(
+          new CustomEvent('halisaha:open-invite-modal', { detail: { playerId: player.id } })
+        );
+      }
     }
   };
 
@@ -1205,14 +1211,28 @@ ${generalDecline}
               </div>
             </div>
 
-            <div className="flex items-center space-x-1.5 shrink-0">
+            <div className="flex items-center flex-wrap gap-1.5 shrink-0">
+              <button
+                onClick={() =>
+                  window.dispatchEvent(
+                    new CustomEvent('halisaha:open-invite-modal', {
+                      detail: { playerId: playerNotifyToast.player.id },
+                    })
+                  )
+                }
+                className="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-black text-[11px] flex items-center space-x-1 shadow-md transition-all active:scale-95"
+                title="Oyuncunun ekranına düşen davet panelini önizle / yanıtla"
+              >
+                <BellRing className="w-3.5 h-3.5" />
+                <span>Davet Panelini Gör</span>
+              </button>
               <button
                 onClick={() => openPersonalWhatsAppPing(playerNotifyToast.player)}
                 className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center space-x-1 shadow-md transition-all active:scale-95"
                 title="Oyuncunun telefonuna tek tıkla yanıt linkini WhatsApp'tan da ilet"
               >
                 <MessageCircle className="w-3.5 h-3.5" />
-                <span>WhatsApp ile Telefona İlet</span>
+                <span>WhatsApp ile İlet</span>
               </button>
               <button
                 onClick={() => setPlayerNotifyToast(null)}
@@ -1239,7 +1259,7 @@ ${generalDecline}
               const isSatti = status === 'Satış koydu' || status === 'Son dakika iptal';
               const isPaid = !!currentMatch.payments[p.id]?.isPaid;
               const reqInfo = currentMatch.attendanceRequests?.[p.id];
-              const isWaitingNotificationResponse = reqInfo?.status === 'pending' && isPending;
+              const isWaitingNotificationResponse = hasActiveMatchInvitation(p.id, currentMatch);
 
               return (
                 <div

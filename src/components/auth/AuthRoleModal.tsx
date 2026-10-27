@@ -19,6 +19,7 @@ import { useApp } from '../../context/AppContext';
 import { ADMIN_USERS, DEFAULT_GUEST_USER } from '../../data/initialData';
 import { AppUser, Player } from '../../types';
 import { requestNotificationPermission } from '../../services/notifications';
+import { hasActiveMatchInvitation } from '../../utils/permissions';
 
 interface AuthRoleModalProps {
   onClose: () => void;
@@ -59,8 +60,8 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
   // Include all players in player selector, prioritizing those with a pending "🔔 Sor" invite
   const guestCandidates = useMemo(() => {
     const sorted = [...players].sort((a, b) => {
-      const aInvite = currentMatch.attendanceRequests?.[a.id]?.status === 'pending' ? 1 : 0;
-      const bInvite = currentMatch.attendanceRequests?.[b.id]?.status === 'pending' ? 1 : 0;
+      const aInvite = hasActiveMatchInvitation(a.id, currentMatch) ? 1 : 0;
+      const bInvite = hasActiveMatchInvitation(b.id, currentMatch) ? 1 : 0;
       if (aInvite !== bInvite) return bInvite - aInvite;
       return a.name.localeCompare(b.name, 'tr');
     });
@@ -68,9 +69,10 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
     if (!playerSearch.trim()) return sorted;
     const q = playerSearch.toLowerCase().trim();
     return sorted.filter(p => p.name.toLowerCase().includes(q));
-  }, [players, playerSearch, currentMatch.attendanceRequests]);
+  }, [players, playerSearch, currentMatch]);
 
   const handleSelectAdmin = (admin: AppUser) => {
+    requestNotificationPermission().catch(() => {});
     if (currentUser.id === admin.id) {
       onClose();
       return;
@@ -107,6 +109,7 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
     const adminToSet = targetAdmin || pendingAdmin || ADMIN_USERS[0];
     localStorage.setItem('halisaha_admin_authenticated', 'true');
     setCurrentUser(adminToSet);
+    requestNotificationPermission().catch(() => {});
     try {
       confetti({ particleCount: 40, spread: 70, origin: { y: 0.5 } });
     } catch {}
@@ -499,11 +502,7 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {guestCandidates.map(p => {
                       const isSelected = currentUser.playerId === p.id && currentUser.role === 'player';
-                      const req = currentMatch.attendanceRequests?.[p.id];
-                      const st = currentMatch.attendance?.[p.id];
-                      const hasPendingInvite =
-                        req?.status === 'pending' &&
-                        (!st || st === 'Haber Bekleniyor' || st === 'Beklemede');
+                      const hasPendingInvite = hasActiveMatchInvitation(p.id, currentMatch);
                       return (
                         <button
                           key={p.id}

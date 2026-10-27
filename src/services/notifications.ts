@@ -76,15 +76,34 @@ export async function sendSystemNotification({
 
   if (!isNotificationSupported()) return false;
 
+  if (Notification.permission === 'default') {
+    try {
+      await requestNotificationPermission();
+    } catch {}
+  }
+
   if (Notification.permission !== 'granted') {
-    const perm = await requestNotificationPermission();
-    if (perm !== 'granted') return false;
+    return false;
   }
 
   try {
-    // If Service Worker is ready, use showNotification (works on Mobile PWA lockscreen)
+    // 1. If Service Worker is ready, use showNotification (works on Mobile PWA & Android Chrome)
     if ('serviceWorker' in navigator) {
       try {
+        if (navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: 'SHOW_NOTIFICATION',
+            title,
+            options: {
+              body,
+              icon,
+              badge,
+              tag,
+              renotify: true,
+              vibrate: [250, 100, 250, 100, 350],
+            },
+          });
+        }
         const registration = await navigator.serviceWorker.ready;
         if (registration && registration.showNotification) {
           await registration.showNotification(title, {
@@ -92,6 +111,7 @@ export async function sendSystemNotification({
             icon,
             badge,
             tag,
+            ...({ renotify: true, vibrate: [250, 100, 250, 100, 350] } as Record<string, unknown>),
           });
           return true;
         }
@@ -100,7 +120,7 @@ export async function sendSystemNotification({
       }
     }
 
-    // Direct Browser Notification fallback
+    // 2. Direct Browser Notification fallback
     new Notification(title, {
       body,
       icon,

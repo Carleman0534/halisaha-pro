@@ -17,9 +17,13 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useApp } from '../../context/AppContext';
-import { isPlayerExemptForMatch } from '../../utils/permissions';
+import { isPlayerExemptForMatch, hasActiveMatchInvitation } from '../../utils/permissions';
 import { getMatchMapsUrl } from '../../services/firebase';
-import { sendSystemNotification, playNotificationChimeAndVibrate } from '../../services/notifications';
+import {
+  sendSystemNotification,
+  playNotificationChimeAndVibrate,
+  requestNotificationPermission,
+} from '../../services/notifications';
 import { AppUser } from '../../types';
 
 export const AttendanceActionModal: React.FC = () => {
@@ -39,6 +43,42 @@ export const AttendanceActionModal: React.FC = () => {
   const [activePlayerId, setActivePlayerId] = useState<string>('');
   const [copiedIban, setCopiedIban] = useState(false);
   const [dismissedToken, setDismissedToken] = useState<string | null>(null);
+
+  // Reset dismissal whenever the logged-in user switches profile
+  useEffect(() => {
+    setDismissedToken(null);
+  }, [currentUser.playerId, currentUser.id]);
+
+  // Allow any button in the app to explicitly open the invitation modal for a player
+  useEffect(() => {
+    const handleExplicitOpen = (e: Event) => {
+      const custom = e as CustomEvent<{ playerId?: string }>;
+      const pid = custom.detail?.playerId || currentUser.playerId;
+      if (pid) {
+        setActivePlayerId(pid);
+        setDismissedToken(null);
+        setModalMode('prompt');
+        setIsOpen(true);
+      }
+    };
+    window.addEventListener('halisaha:open-invite-modal', handleExplicitOpen);
+    return () => window.removeEventListener('halisaha:open-invite-modal', handleExplicitOpen);
+  }, [currentUser.playerId]);
+
+  // Request notification permission on first user tap if still 'default'
+  useEffect(() => {
+    const handleFirstGesture = () => {
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+        requestNotificationPermission().catch(() => {});
+      }
+    };
+    window.addEventListener('click', handleFirstGesture, { once: true });
+    window.addEventListener('touchstart', handleFirstGesture, { once: true });
+    return () => {
+      window.removeEventListener('click', handleFirstGesture);
+      window.removeEventListener('touchstart', handleFirstGesture);
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -167,15 +207,13 @@ export const AttendanceActionModal: React.FC = () => {
         return;
       }
 
-      // 3. ONLY show prompt if an Admin/Council member explicitly clicked "🔔 Sor" for THIS player!
+      // 3. Show prompt whenever THIS player has an active "🔔 Sor" invitation!
       if (currentUser.playerId) {
         const myId = currentUser.playerId;
         const req = currentMatch.attendanceRequests?.[myId];
-        const status = currentMatch.attendance[myId];
-        const isStillPending =
-          !status || status === 'Haber Bekleniyor' || status === 'Beklemede';
+        const isInvited = hasActiveMatchInvitation(myId, currentMatch);
 
-        if (req && req.status === 'pending' && req.requestedAt && isStillPending) {
+        if (isInvited && req && req.requestedAt) {
           setActivePlayerId(myId);
 
           // Trigger phone notification + sound + vibration ONCE for this specific request timestamp
@@ -187,7 +225,7 @@ export const AttendanceActionModal: React.FC = () => {
             playNotificationChimeAndVibrate();
             sendSystemNotification({
               title: `⚽ ${myName} — Maça Geliyor musun?`,
-              body: `${req.requestedBy || 'Konsey'} sizi ${currentMatch.matchNumber}. Hafta maçına davet etti! Katılım durumunuzu seçin.`,
+              body: `${req.requestedBy || 'Konsey'} sizi ${currentMatch.matchNumber}. Hafta maçına davet etti! Saha: ${currentMatch.venueName}`,
               tag: `invite-req-${currentMatch.id}-${myId}`,
             }).catch(() => {});
           }

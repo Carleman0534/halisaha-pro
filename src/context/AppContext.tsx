@@ -56,8 +56,13 @@ import {
   setLocalMatchTimestamp,
   mergeMatchWithSavedInvites,
   saveAttendanceRequestsLocal,
+  pushPlayerInviteToCloud,
 } from '../services/firebase';
-import { sendSystemNotification } from '../services/notifications';
+import {
+  sendSystemNotification,
+  playNotificationChimeAndVibrate,
+  requestNotificationPermission,
+} from '../services/notifications';
 import { isPlayerExemptForMatch } from '../utils/permissions';
 
 interface AppContextType {
@@ -835,6 +840,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status === 'Son dakika iptal' ||
       status === 'Satış koydu';
 
+    const nowIso = new Date().toISOString();
+
     const applyToMatch = (prev: Match): Match => {
       const updatedAttendance = {
         ...prev.attendance,
@@ -843,14 +850,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const updatedTimestamps = {
         ...(prev.attendanceTimestamps || {}),
-        [playerId]: new Date().toISOString(),
+        [playerId]: nowIso,
       };
 
       const updatedAudits = {
         ...(prev.attendanceAdminAudits || {}),
         [playerId]: {
           modifiedBy: operator,
-          modifiedAt: new Date().toISOString(),
+          modifiedAt: nowIso,
           prevStatus: prev.attendance[playerId],
         },
       };
@@ -859,20 +866,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const existingReq = prev.attendanceRequests?.[playerId];
       const updatedRequests = {
         ...(prev.attendanceRequests || {}),
-        ...(existingReq
+        ...(isPendingNow
           ? {
-              [playerId]: isPendingNow
-                ? {
-                    playerId: existingReq.playerId,
-                    requestedAt: existingReq.requestedAt,
-                    requestedBy: existingReq.requestedBy,
-                    status: 'pending' as const,
-                  }
-                : {
-                    ...existingReq,
-                    status: 'responded' as const,
-                    respondedAt: new Date().toISOString(),
-                  },
+              [playerId]: {
+                playerId,
+                requestedAt: nowIso,
+                requestedBy: operator,
+                status: 'pending' as const,
+              },
+            }
+          : existingReq
+          ? {
+              [playerId]: {
+                ...existingReq,
+                status: 'responded' as const,
+                respondedAt: nowIso,
+              },
             }
           : {}),
       };
@@ -921,6 +930,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         attendanceAdminAudits: updatedAudits,
         adminDeclineAlerts: updatedAlerts,
       };
+
+      if (isCurrent) {
+        if (isPendingNow) {
+          pushPlayerInviteToCloud(nextMatch, playerId, operator, nowIso, 'pending');
+        } else if (existingReq) {
+          pushPlayerInviteToCloud(
+            nextMatch,
+            playerId,
+            existingReq.requestedBy || operator,
+            nowIso,
+            'responded',
+            status
+          );
+        }
+      }
 
       saveMatchToDatabase(nextMatch, isCurrent);
       return nextMatch;
@@ -1006,6 +1030,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, message: 'Oyuncu bulunamadı.' };
     }
 
+    playNotificationChimeAndVibrate();
+    requestNotificationPermission().catch(() => {});
+
     const nowIso = new Date().toISOString();
     const baseMatch = getLocalCurrentMatch(currentMatch);
 
@@ -1013,6 +1040,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const updatedAttendance = {
         ...prev.attendance,
         [playerId]: 'Haber Bekleniyor' as AttendanceStatus,
+      };
+
+      const updatedTimestamps = {
+        ...(prev.attendanceTimestamps || {}),
+        [playerId]: nowIso,
       };
 
       const updatedRequests = {
@@ -1052,12 +1084,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return {
         ...prev,
         attendance: updatedAttendance,
+        attendanceTimestamps: updatedTimestamps,
         attendanceRequests: updatedRequests,
         notificationLogs: [dispatchLog, ...(prev.notificationLogs || []).slice(0, 20)],
       };
     };
 
     const immediateNextMatch = buildUpdatedMatch(baseMatch);
+    pushPlayerInviteToCloud(immediateNextMatch, playerId, currentUser.name, nowIso, 'pending');
     await saveMatchToDatabase(immediateNextMatch, true, true);
     setCurrentMatch(prev => {
       const next = buildUpdatedMatch(prev);

@@ -87,6 +87,27 @@ export function canRatePlayers(user: AppUser): boolean {
 }
 
 /**
+ * Checks whether a given player currently has an active, unanswered match invitation ("🔔 Sor").
+ */
+export function hasActiveMatchInvitation(playerId: string | undefined, match: Match): boolean {
+  if (!playerId || !match) return false;
+  const req = match.attendanceRequests?.[playerId];
+  const status = match.attendance?.[playerId];
+
+  if (req && req.status === 'pending' && req.requestedAt) {
+    if (!status || status === 'Haber Bekleniyor' || status === 'Beklemede') {
+      return true;
+    }
+    const reqTs = Date.parse(req.requestedAt) || 0;
+    const respTs = req.respondedAt ? Date.parse(req.respondedAt) || 0 : 0;
+    if (reqTs > respTs) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Evaluates whether a user is allowed to view match details (date, time, venue, location, squad).
  * STRICT RULE:
  * - Council members and Admins can always view all match details.
