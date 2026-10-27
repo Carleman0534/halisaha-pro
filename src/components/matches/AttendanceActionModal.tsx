@@ -38,6 +38,7 @@ export const AttendanceActionModal: React.FC = () => {
   const [modalMode, setModalMode] = useState<'prompt' | 'confirmed' | 'declined'>('prompt');
   const [activePlayerId, setActivePlayerId] = useState<string>('');
   const [copiedIban, setCopiedIban] = useState(false);
+  const [dismissedToken, setDismissedToken] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -191,8 +192,8 @@ export const AttendanceActionModal: React.FC = () => {
             }).catch(() => {});
           }
 
-          const dismissedKey = `halisaha_prompt_dismissed_${currentMatch.id}_${myId}`;
-          if (sessionStorage.getItem(dismissedKey) !== req.requestedAt) {
+          const currentToken = `${currentMatch.id}_${myId}_${req.requestedAt}`;
+          if (dismissedToken !== currentToken) {
             setModalMode('prompt');
             setIsOpen(true);
           }
@@ -209,8 +210,9 @@ export const AttendanceActionModal: React.FC = () => {
   }, [
     currentUser.playerId,
     currentMatch.id,
-    currentMatch.attendanceRequests?.[currentUser.playerId || '']?.requestedAt,
-    currentMatch.attendanceRequests?.[currentUser.playerId || '']?.status,
+    currentMatch.attendanceRequests,
+    currentMatch.attendance,
+    dismissedToken,
   ]);
 
   const targetId = activePlayerId || currentUser.playerId;
@@ -242,9 +244,8 @@ export const AttendanceActionModal: React.FC = () => {
   };
 
   const handleClose = () => {
-    if (activeRequest?.requestedAt) {
-      const dismissedKey = `halisaha_prompt_dismissed_${currentMatch.id}_${targetId}`;
-      sessionStorage.setItem(dismissedKey, activeRequest.requestedAt);
+    if (activeRequest?.requestedAt && targetId) {
+      setDismissedToken(`${currentMatch.id}_${targetId}_${activeRequest.requestedAt}`);
     }
     setIsOpen(false);
   };

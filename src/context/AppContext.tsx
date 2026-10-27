@@ -54,6 +54,8 @@ import {
   fetchLatestMatchFromCloudSync,
   getLocalMatchTimestamp,
   setLocalMatchTimestamp,
+  mergeMatchWithSavedInvites,
+  saveAttendanceRequestsLocal,
 } from '../services/firebase';
 import { sendSystemNotification } from '../services/notifications';
 import { isPlayerExemptForMatch } from '../utils/permissions';
@@ -355,16 +357,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCurrentUser(user);
     try {
       localStorage.setItem('halisaha_current_user', JSON.stringify(user));
-      // Ensure active match is always consistent across user switches
+      // Ensure active match is always consistent across user switches and preserves local invites
       const latestMatch = getLocalCurrentMatch(currentMatch);
       if (latestMatch && latestMatch.id) {
         setCurrentMatch(latestMatch);
       }
-      fetchLatestMatchFromCloudSync().then(cloudData => {
+      fetchLatestMatchFromCloudSync(true).then(cloudData => {
         if (cloudData && cloudData.match && cloudData.ts >= getLocalMatchTimestamp()) {
+          const merged = mergeMatchWithSavedInvites(cloudData.match);
           setLocalMatchTimestamp(cloudData.ts);
-          saveMatchToDatabase(cloudData.match, true, false);
-          setCurrentMatch(cloudData.match);
+          saveMatchToDatabase(merged, true, false);
+          setCurrentMatch(merged);
         }
       });
     } catch {}
@@ -858,14 +861,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...(prev.attendanceRequests || {}),
         ...(existingReq
           ? {
-              [playerId]: {
-                ...existingReq,
-                status: isPendingNow ? ('pending' as const) : ('responded' as const),
-                respondedAt: isPendingNow ? undefined : new Date().toISOString(),
-              },
+              [playerId]: isPendingNow
+                ? {
+                    playerId: existingReq.playerId,
+                    requestedAt: existingReq.requestedAt,
+                    requestedBy: existingReq.requestedBy,
+                    status: 'pending' as const,
+                  }
+                : {
+                    ...existingReq,
+                    status: 'responded' as const,
+                    respondedAt: new Date().toISOString(),
+                  },
             }
           : {}),
       };
+      saveAttendanceRequestsLocal(prev.id, updatedRequests);
 
       let newSquad = [...prev.squad];
       if (status === 'Geliyor' || status === 'Geldi') {
@@ -996,8 +1007,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const nowIso = new Date().toISOString();
+    const baseMatch = getLocalCurrentMatch(currentMatch);
 
-    setCurrentMatch(prev => {
+    const buildUpdatedMatch = (prev: Match): Match => {
       const updatedAttendance = {
         ...prev.attendance,
         [playerId]: 'Haber Bekleniyor' as AttendanceStatus,
@@ -1027,24 +1039,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           {
             playerId: player.id,
             playerName: player.name,
-            phone: player.phone,
+            ...(player.phone ? { phone: player.phone } : {}),
             status: 'delivered',
           },
         ],
         note: `${player.name} için maça katılım bildirimi gönderildi (Haber Bekleniyor).`,
       };
 
+      saveAttendanceRequestsLocal(prev.id, updatedRequests);
       appendLocalNotificationLog(dispatchLog);
 
-      const nextMatch: Match = {
+      return {
         ...prev,
         attendance: updatedAttendance,
         attendanceRequests: updatedRequests,
         notificationLogs: [dispatchLog, ...(prev.notificationLogs || []).slice(0, 20)],
       };
+    };
 
-      saveMatchToDatabase(nextMatch, true);
-      return nextMatch;
+    const immediateNextMatch = buildUpdatedMatch(baseMatch);
+    await saveMatchToDatabase(immediateNextMatch, true, true);
+    setCurrentMatch(prev => {
+      const next = buildUpdatedMatch(prev);
+      saveMatchToDatabase(next, true, false);
+      return next;
     });
 
     return {
@@ -1086,13 +1104,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     }
 
-    // 1. Filter ONLY players who have not answered (Pending)
+    // 1. Filter ONLY players who have a pending invitation ("🔔 Sor") or are explicitly marked Haber Bekleniyor
     const pendingPlayers = players.filter(p => {
+      const req = targetMatch.attendanceRequests?.[p.id];
       const st = targetMatch.attendance?.[p.id];
       return (
-        !st ||
-        st === 'Haber Bekleniyor' ||
-        st === 'Beklemede'
+        (req && req.status === 'pending') &&
+        (!st || st === 'Haber Bekleniyor' || st === 'Beklemede')
       );
     });
 
@@ -1133,18 +1151,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch {}
 
     // 4. Construct detailed recipient results
+    const nowIso = new Date().toISOString();
     const recipients = pendingPlayers.map(p => ({
       playerId: p.id,
       playerName: p.name,
-      phone: p.phone,
-      status: 'success' as const,
+      ...(p.phone ? { phone: p.phone } : {}),
+      status: 'delivered' as const,
     }));
 
     const dispatchLog: NotificationDispatchLog = {
       id: `disp_${Date.now()}`,
       matchId: targetMatch.id,
       matchNumber: targetMatch.matchNumber,
-      dispatchedAt: new Date().toISOString(),
+      dispatchedAt: nowIso,
       dispatchedBy: currentUser.name,
       totalTargeted: pendingPlayers.length,
       successfulCount: pendingPlayers.length,
@@ -1157,8 +1176,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     appendLocalNotificationLog(dispatchLog);
 
     const updateLogs = (prev: Match): Match => {
+      const nextRequests = { ...(prev.attendanceRequests || {}) };
+      pendingPlayers.forEach(p => {
+        nextRequests[p.id] = {
+          playerId: p.id,
+          requestedAt: nowIso,
+          requestedBy: currentUser.name,
+          status: 'pending',
+        };
+      });
+      saveAttendanceRequestsLocal(prev.id, nextRequests);
+
       const updated = {
         ...prev,
+        attendanceRequests: nextRequests,
         notificationLogs: [dispatchLog, ...(prev.notificationLogs || []).slice(0, 20)],
       };
       saveMatchToDatabase(updated);

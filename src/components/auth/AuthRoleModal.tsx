@@ -29,7 +29,7 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
   onClose,
   defaultTab = 'admin',
 }) => {
-  const { currentUser, setCurrentUser, players, isAdmin } = useApp();
+  const { currentUser, setCurrentUser, players, isAdmin, currentMatch } = useApp();
 
   const [activeTab, setActiveTab] = useState<'admin' | 'guest'>(defaultTab);
   const [playerSearch, setPlayerSearch] = useState('');
@@ -56,15 +56,19 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
     return localStorage.getItem('halisaha_council_pin') || '1453';
   };
 
-  // Filter non-admin players for guest list
+  // Include all players in player selector, prioritizing those with a pending "🔔 Sor" invite
   const guestCandidates = useMemo(() => {
-    const adminPlayerIds = new Set(ADMIN_USERS.map(a => a.playerId));
-    const nonAdminPlayers = players.filter(p => !adminPlayerIds.has(p.id));
+    const sorted = [...players].sort((a, b) => {
+      const aInvite = currentMatch.attendanceRequests?.[a.id]?.status === 'pending' ? 1 : 0;
+      const bInvite = currentMatch.attendanceRequests?.[b.id]?.status === 'pending' ? 1 : 0;
+      if (aInvite !== bInvite) return bInvite - aInvite;
+      return a.name.localeCompare(b.name, 'tr');
+    });
 
-    if (!playerSearch.trim()) return nonAdminPlayers;
+    if (!playerSearch.trim()) return sorted;
     const q = playerSearch.toLowerCase().trim();
-    return nonAdminPlayers.filter(p => p.name.toLowerCase().includes(q));
-  }, [players, playerSearch]);
+    return sorted.filter(p => p.name.toLowerCase().includes(q));
+  }, [players, playerSearch, currentMatch.attendanceRequests]);
 
   const handleSelectAdmin = (admin: AppUser) => {
     if (currentUser.id === admin.id) {
@@ -494,7 +498,12 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
                   {/* Player List (Full scrollable list right under search) */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {guestCandidates.map(p => {
-                      const isSelected = currentUser.playerId === p.id;
+                      const isSelected = currentUser.playerId === p.id && currentUser.role === 'player';
+                      const req = currentMatch.attendanceRequests?.[p.id];
+                      const st = currentMatch.attendance?.[p.id];
+                      const hasPendingInvite =
+                        req?.status === 'pending' &&
+                        (!st || st === 'Haber Bekleniyor' || st === 'Beklemede');
                       return (
                         <button
                           key={p.id}
@@ -503,6 +512,8 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
                           className={`w-full p-3 rounded-xl border transition-all flex items-center justify-between text-left text-xs active:scale-[0.98] ${
                             isSelected
                               ? 'bg-blue-950/60 border-blue-500/70 shadow-sm ring-1 ring-blue-500/50'
+                              : hasPendingInvite
+                              ? 'bg-amber-950/40 border-amber-500/60 hover:border-amber-400'
                               : 'bg-slate-950/80 border-slate-800 hover:border-slate-700 hover:bg-slate-900'
                           }`}
                         >
@@ -511,7 +522,14 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
                               {p.name.charAt(0)}
                             </div>
                             <div>
-                              <span className="font-bold text-white text-sm block">{p.name}</span>
+                              <div className="flex items-center space-x-1.5 flex-wrap">
+                                <span className="font-bold text-white text-sm">{p.name}</span>
+                                {hasPendingInvite && (
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-black animate-pulse">
+                                    🔔 Davet Bekliyor
+                                  </span>
+                                )}
+                              </div>
                               <span className="text-[11px] text-slate-400 font-medium">
                                 {p.primaryPosition} • Oyuncu
                               </span>
