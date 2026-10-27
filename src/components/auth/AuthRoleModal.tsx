@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
-  Shield,
   Crown,
   User,
   X,
@@ -14,7 +13,6 @@ import {
   ArrowLeft,
   LogOut,
   CheckCircle2,
-  ChevronUp,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useApp } from '../../context/AppContext';
@@ -107,7 +105,6 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
     try {
       confetti({ particleCount: 40, spread: 70, origin: { y: 0.5 } });
     } catch {}
-    // Automatically close immediately upon selection / verification!
     onClose();
   };
 
@@ -168,105 +165,29 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
     try {
       confetti({ particleCount: 25, spread: 50, origin: { y: 0.5 } });
     } catch {}
-    // Automatically close immediately upon selection!
     onClose();
   };
 
   const handleSelectGeneralGuest = () => {
     setCurrentUser(DEFAULT_GUEST_USER);
-    // Automatically close immediately upon selection!
     onClose();
   };
 
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex flex-col justify-start items-center"
+      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col justify-center items-center p-3 sm:p-4"
     >
       {/* ========================================================================= */}
-      {/* HALF-PAGE PULL-DOWN SHADE: SAYFANIN YARISINA KADAR İNER (NET VE OKUNAKLI)   */}
+      {/* CLEAN CENTERED / MOBILE-FRIENDLY MODAL (OYUNCU & YÖNETİCİ SEÇİMİ)         */}
       {/* ========================================================================= */}
       <div
         onClick={e => e.stopPropagation()}
-        className="w-full md:w-[50vw] max-w-2xl bg-slate-900 border-b-2 border-emerald-500/50 rounded-b-3xl shadow-2xl shadow-black/95 flex flex-col max-h-[82vh] md:max-h-[68vh] overflow-hidden animate-phone-shade-down ring-1 ring-slate-700/60"
+        className="w-full max-w-lg bg-slate-900 border border-slate-700/80 rounded-3xl shadow-2xl shadow-black/95 flex flex-col max-h-[85vh] overflow-hidden animate-fade-in"
       >
-        {/* SHADE TOP BAR */}
-        <div className="p-3.5 sm:p-4 border-b border-slate-800 bg-slate-900/98 shrink-0 space-y-2.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2.5">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-md shadow-emerald-500/25 text-white shrink-0">
-                <Shield className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="font-black text-white text-sm sm:text-base flex items-center space-x-2">
-                  <span>Kontrol Merkezi & Yetki Girişi</span>
-                  <span className="text-[9px] px-2 py-0.5 rounded bg-slate-800 text-slate-200 border border-slate-700 uppercase font-mono font-bold">
-                    Hızlı Geçiş
-                  </span>
-                </h3>
-                <p className="text-xs text-slate-300 font-medium">Yönetici (Konsey) veya Misafir / Oyuncu Seçin</p>
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800 transition-colors"
-              title="Kapat"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* QUICK 1-TAP SWITCHER CHIPS */}
-          <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar py-0.5 text-xs select-none">
-            <span className="text-[10px] sm:text-xs uppercase font-bold text-slate-300 shrink-0">⚡ 1-Tık:</span>
-            {ADMIN_USERS.slice(0, 4).map(admin => (
-              <button
-                key={admin.id}
-                type="button"
-                onClick={() => handleSelectAdmin(admin)}
-                className={`px-2.5 py-1 rounded-xl font-bold flex items-center space-x-1 shrink-0 transition-all active:scale-95 border ${
-                  currentUser.id === admin.id
-                    ? 'bg-amber-500 text-black border-amber-400 shadow-sm'
-                    : 'bg-slate-800 text-amber-300 border-slate-700 hover:bg-slate-700'
-                }`}
-              >
-                <Crown className="w-3 h-3" />
-                <span>{admin.name.split(' ')[0]}</span>
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={handleSelectGeneralGuest}
-              className={`px-2.5 py-1 rounded-xl font-bold flex items-center space-x-1 shrink-0 transition-all active:scale-95 border ${
-                currentUser.role === 'guest'
-                  ? 'bg-blue-600 text-white border-blue-400 shadow-sm'
-                  : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700'
-              }`}
-            >
-              <User className="w-3 h-3" />
-              <span>Misafir</span>
-            </button>
-          </div>
-
-          {/* TWO-TONE TOGGLE SWITCHER (ALWAYS AT THE TOP IN PLAIN SIGHT) */}
-          <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-950 rounded-2xl border border-slate-800 text-xs sm:text-sm font-bold shadow-inner">
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('admin');
-                setPendingAdmin(null);
-                setShowChangePin(false);
-              }}
-              className={`flex items-center justify-center space-x-2 py-2.5 sm:py-3 rounded-xl transition-all ${
-                activeTab === 'admin'
-                  ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-black font-black shadow-lg shadow-amber-500/30 border border-amber-300'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-900'
-              }`}
-            >
-              <Crown className="w-4 h-4 text-amber-300 shrink-0" />
-              <span className="text-xs sm:text-sm font-black">👑 Yöneticiye Geç (Konsey)</span>
-            </button>
-
+        {/* COMPACT TOP BAR: TAB SWITCHER + CLOSE BUTTON */}
+        <div className="p-2.5 sm:p-3 border-b border-slate-800 bg-slate-950/90 shrink-0 flex items-center gap-2">
+          <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-900 rounded-2xl border border-slate-800 flex-1 text-xs sm:text-sm font-bold">
             <button
               type="button"
               onClick={() => {
@@ -274,79 +195,61 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
                 setPendingAdmin(null);
                 setShowChangePin(false);
               }}
-              className={`flex items-center justify-center space-x-2 py-2.5 sm:py-3 rounded-xl transition-all ${
+              className={`flex items-center justify-center space-x-1.5 py-2 sm:py-2.5 rounded-xl transition-all ${
                 activeTab === 'guest'
-                  ? 'bg-blue-600 text-white font-black shadow-lg shadow-blue-500/30 border border-blue-400'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-900'
+                  ? 'bg-blue-600 text-white font-black shadow-md shadow-blue-500/30 border border-blue-400'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
-              <User className="w-4 h-4 text-blue-200 shrink-0" />
-              <span className="text-xs sm:text-sm font-black">👤 Misafir / Oyuncu</span>
+              <User className="w-4 h-4 shrink-0" />
+              <span>⚽ Oyuncu Seç</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('admin');
+                setPendingAdmin(null);
+                setShowChangePin(false);
+              }}
+              className={`flex items-center justify-center space-x-1.5 py-2 sm:py-2.5 rounded-xl transition-all ${
+                activeTab === 'admin'
+                  ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-black font-black shadow-md shadow-amber-500/30 border border-amber-300'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <Crown className="w-4 h-4 shrink-0" />
+              <span>👑 Yönetici (Konsey)</span>
             </button>
           </div>
+
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-white p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 transition-colors shrink-0"
+            title="Kapat"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        {/* SHADE SCROLLABLE CONTENT BODY */}
+        {/* SCROLLABLE CONTENT BODY */}
         <div className="p-3 sm:p-4 overflow-y-auto flex-1 min-h-0 space-y-3">
-          {/* Current Active Profile Status */}
-          <div className="p-3 rounded-2xl bg-slate-950/90 border border-slate-800 flex items-center justify-between text-xs sm:text-sm">
-            <div className="flex items-center space-x-3">
-              {currentUser.role === 'admin' ? (
-                <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center">
-                  <Crown className="w-5 h-5" />
-                </div>
-              ) : currentUser.role === 'council_member' ? (
-                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
-                  <Shield className="w-5 h-5" />
-                </div>
-              ) : currentUser.role === 'player' ? (
-                <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center">
-                  <User className="w-5 h-5" />
-                </div>
-              ) : (
-                <div className="w-9 h-9 rounded-xl bg-slate-800 text-slate-300 border border-slate-700 flex items-center justify-center">
-                  <User className="w-5 h-5" />
-                </div>
-              )}
-              <div>
-                <span className="text-[11px] text-slate-400 block font-medium">Şu Anki Oturum:</span>
-                <span className="font-black text-white text-sm sm:text-base">{currentUser.name}</span>
+          {/* Compact Active Session Bar (Only shown if already logged in as someone) */}
+          {currentUser.role !== 'guest' && (
+            <div className="px-3 py-2 rounded-xl bg-slate-950/90 border border-slate-800 flex items-center justify-between text-xs">
+              <div className="flex items-center space-x-2 min-w-0">
+                <span className="text-slate-400 shrink-0">Aktif:</span>
+                <span className="font-black text-white truncate">{currentUser.name}</span>
               </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <span
-                className={`text-[10px] sm:text-xs px-2.5 py-0.5 rounded-full font-black border ${
-                  currentUser.role === 'admin'
-                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                    : currentUser.role === 'council_member'
-                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                    : currentUser.role === 'player'
-                    ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
-                    : 'bg-slate-700/40 text-slate-300 border-slate-600'
-                }`}
+              <button
+                onClick={handleLogoutToGuest}
+                className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 text-xs font-bold flex items-center space-x-1 shrink-0"
               >
-                {currentUser.role === 'admin'
-                  ? '👑 Yönetici'
-                  : currentUser.role === 'council_member'
-                  ? '🛡️ Konsey'
-                  : currentUser.role === 'player'
-                  ? '⚽ Oyuncu'
-                  : '👤 Misafir'}
-              </span>
-
-              {/* LOGOUT BUTTON FOR ALL LOGGED-IN USERS */}
-              {currentUser.role !== 'guest' && (
-                <button
-                  onClick={handleLogoutToGuest}
-                  title="Oturumu Kapat ve Misafir Ol"
-                  className="px-2.5 py-1 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 hover:text-rose-100 text-xs font-bold transition-all active:scale-95 flex items-center space-x-1"
-                >
-                  <LogOut className="w-3.5 h-3.5 text-rose-400" />
-                  <span>Çıkış</span>
-                </button>
-              )}
+                <LogOut className="w-3.5 h-3.5 text-rose-400" />
+                <span>Çıkış Yap</span>
+              </button>
             </div>
-          </div>
+          )}
 
           {/* ============================================================ */}
           {/* SUB-VIEW 1: PIN PROMPT FOR COUNCIL MEMBER LOGIN              */}
@@ -376,7 +279,7 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
                   👑 {pendingAdmin.name} Oturumu
                 </h4>
                 <p className="text-xs text-amber-200 leading-relaxed font-medium">
-                  4 haneli Konsey PIN şifrenizi girin (yazınca <strong>otomatik açılır ve perde kapanır</strong>):
+                  4 haneli Konsey PIN şifrenizi girin:
                 </p>
               </div>
 
@@ -417,16 +320,10 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
                     className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 disabled:opacity-50 text-black font-black text-xs shadow-lg shadow-amber-500/20 transition-all active:scale-95 flex items-center justify-center space-x-1.5"
                   >
                     <KeyRound className="w-4 h-4" />
-                    <span>Giriş Yap ve Kapat</span>
+                    <span>Giriş Yap</span>
                   </button>
                 </div>
               </form>
-
-              <div className="text-center pt-0.5">
-                <span className="text-[11px] text-slate-400 font-medium">
-                  Varsayılan PIN: <code className="text-amber-400 font-mono font-bold">1453</code>
-                </span>
-              </div>
             </div>
           ) : showChangePin ? (
             /* ============================================================ */
@@ -506,14 +403,6 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
               {/* ============================================================ */}
               {activeTab === 'admin' && (
                 <div className="space-y-2.5">
-                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-200 flex items-start space-x-2.5">
-                    <Crown className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                    <div className="leading-relaxed">
-                      <span className="font-bold text-amber-300 block">Yönetici Profilinizi Seçin:</span>
-                      İsminize dokunduğunuzda profil aktifleşir ve perde <strong>otomatik kapanır</strong>.
-                    </div>
-                  </div>
-
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {ADMIN_USERS.map(admin => {
                       const isSelected = currentUser.id === admin.id;
@@ -547,7 +436,7 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
                                   </span>
                                 )}
                               </div>
-                              <span className="text-[11px] text-slate-300 font-medium flex items-center space-x-1 mt-0.5">
+                              <span className="text-[11px] text-slate-400 font-medium flex items-center space-x-1 mt-0.5">
                                 <Lock className="w-3 h-3 text-amber-400/80" />
                                 <span>PIN Korumalı Yönetici</span>
                               </span>
@@ -588,54 +477,20 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
               {/* ============================================================ */}
               {activeTab === 'guest' && (
                 <div className="space-y-2.5">
-                  <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/25 text-xs text-blue-200 flex items-start space-x-2.5">
-                    <User className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-                    <div className="leading-relaxed">
-                      <span className="font-bold text-blue-300 block">Misafir veya Oyuncu Seçin:</span>
-                      İsminize dokunduğunuzda profiliniz açılır ve perde <strong>otomatik kapanır</strong>.
-                    </div>
-                  </div>
-
-                  {/* General Viewer Option */}
-                  <button
-                    type="button"
-                    onClick={handleSelectGeneralGuest}
-                    className={`w-full p-3 rounded-2xl border transition-all flex items-center justify-between text-left active:scale-[0.98] ${
-                      currentUser.id === DEFAULT_GUEST_USER.id
-                        ? 'bg-blue-950/50 border-blue-500/70 shadow-md ring-1 ring-blue-500/50'
-                        : 'bg-slate-950/80 border-slate-800 hover:border-slate-700 hover:bg-slate-900'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-2.5">
-                      <div className="w-9 h-9 rounded-xl bg-blue-500/20 border border-blue-500/30 text-blue-400 flex items-center justify-center font-bold">
-                        <Eye className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <span className="font-bold text-sm text-white">Genel Misafir / İzleyici</span>
-                        <span className="text-xs text-slate-300 block">Sadece kadro ve maçları incele</span>
-                      </div>
-                    </div>
-                    {currentUser.id === DEFAULT_GUEST_USER.id ? (
-                      <Check className="w-5 h-5 text-blue-400 stroke-[3]" />
-                    ) : (
-                      <span className="text-xs text-slate-300 font-bold bg-slate-800 px-2.5 py-1 rounded-lg">Seç →</span>
-                    )}
-                  </button>
-
                   {/* Search Player to Login as */}
                   <div className="relative">
                     <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                       type="text"
-                      placeholder="İsminizi arayın (Talha, Sidar, Ömer, Emre, Fatih...)"
+                      placeholder="İsminizi arayın (Talha, Sidar, Ömer, Emre...)"
                       value={playerSearch}
                       onChange={e => setPlayerSearch(e.target.value)}
-                      className="w-full pl-9 pr-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                      className="w-full pl-9 pr-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
                     />
                   </div>
 
-                  {/* Player List (Responsive 2-column grid) */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-1">
+                  {/* Player List (Full scrollable list right under search) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {guestCandidates.map(p => {
                       const isSelected = currentUser.playerId === p.id;
                       return (
@@ -643,54 +498,62 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
                           key={p.id}
                           type="button"
                           onClick={() => handleSelectPlayerGuest(p)}
-                          className={`w-full p-2.5 rounded-xl border transition-all flex items-center justify-between text-left text-xs active:scale-[0.98] ${
+                          className={`w-full p-3 rounded-xl border transition-all flex items-center justify-between text-left text-xs active:scale-[0.98] ${
                             isSelected
-                              ? 'bg-blue-950/50 border-blue-500/70 shadow-sm ring-1 ring-blue-500/50'
-                              : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 hover:bg-slate-900'
+                              ? 'bg-blue-950/60 border-blue-500/70 shadow-sm ring-1 ring-blue-500/50'
+                              : 'bg-slate-950/80 border-slate-800 hover:border-slate-700 hover:bg-slate-900'
                           }`}
                         >
-                          <div className="flex items-center space-x-2">
-                            <div className="w-7 h-7 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 flex items-center justify-center font-bold text-xs">
+                          <div className="flex items-center space-x-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/30 flex items-center justify-center font-black text-xs">
                               {p.name.charAt(0)}
                             </div>
                             <div>
-                              <span className="font-bold text-white text-xs sm:text-sm block">{p.name}</span>
-                              <span className="text-[10px] text-slate-300 font-medium">
-                                {p.primaryPosition} • Kayıtlı Oyuncu
+                              <span className="font-bold text-white text-sm block">{p.name}</span>
+                              <span className="text-[11px] text-slate-400 font-medium">
+                                {p.primaryPosition} • Oyuncu
                               </span>
                             </div>
                           </div>
 
                           {isSelected ? (
-                            <span className="text-[10px] px-2 py-0.5 rounded bg-blue-500 text-white font-bold">
-                              Aktif
+                            <span className="text-[11px] px-2.5 py-1 rounded-lg bg-blue-500 text-white font-bold">
+                              Aktif ✓
                             </span>
                           ) : (
-                            <span className="text-xs text-blue-400 font-bold hover:text-white">Seç →</span>
+                            <span className="text-xs text-blue-400 font-bold bg-blue-500/10 px-2.5 py-1 rounded-lg border border-blue-500/20">
+                              Seç →
+                            </span>
                           )}
                         </button>
                       );
                     })}
                   </div>
+
+                  {/* General Viewer Option at bottom */}
+                  <button
+                    type="button"
+                    onClick={handleSelectGeneralGuest}
+                    className={`w-full p-2.5 rounded-xl border transition-all flex items-center justify-between text-left active:scale-[0.98] ${
+                      currentUser.id === DEFAULT_GUEST_USER.id
+                        ? 'bg-slate-800 border-slate-600'
+                        : 'bg-slate-950/60 border-slate-800/80 hover:bg-slate-900'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <Eye className="w-4 h-4 text-slate-400 ml-1" />
+                      <span className="font-bold text-xs text-slate-300">Genel Misafir (İzleyici Modu)</span>
+                    </div>
+                    {currentUser.id === DEFAULT_GUEST_USER.id ? (
+                      <span className="text-[10px] text-slate-400 font-bold">Aktif</span>
+                    ) : (
+                      <span className="text-xs text-slate-400 font-bold">Geç →</span>
+                    )}
+                  </button>
                 </div>
               )}
             </>
           )}
-        </div>
-
-        {/* ============================================================ */}
-        {/* DRAG HANDLE BAR (PULL-UP HANDLE — TIKLAYINCA YUKARI KAPANIR) */}
-        {/* ============================================================ */}
-        <div
-          onClick={onClose}
-          className="py-2.5 bg-slate-950 hover:bg-slate-900 border-t border-slate-800 cursor-pointer flex flex-col items-center justify-center space-y-0.5 transition-colors select-none group shrink-0"
-          title="Perdeyi Kapatmak İçin Dokunun"
-        >
-          <div className="w-14 h-1.5 rounded-full bg-slate-600 group-hover:bg-slate-400 transition-colors" />
-          <div className="flex items-center space-x-1 text-[11px] text-slate-400 group-hover:text-amber-400 font-bold tracking-wider uppercase">
-            <ChevronUp className="w-3.5 h-3.5" />
-            <span>Kapatmak İçin Dokunun</span>
-          </div>
         </div>
       </div>
     </div>
