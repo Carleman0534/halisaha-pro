@@ -85,35 +85,35 @@ export const MatchPlanner: React.FC<MatchPlannerProps> = ({ onNavigateToSquad })
           <EmergencySubstituteFinder onNavigateToSquad={onNavigateToSquad} />
 
       {/* Maç Sonu İşlemleri & Takvim Çubuğu */}
-      <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+      <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
         <div>
           <span className="text-xs font-bold text-white block">Maç İşlemleri & Takvim</span>
           <span className="text-[10px] text-slate-400">Skor, MVP ve takvim entegrasyonu</span>
         </div>
 
-        <div className="flex items-center space-x-1.5">
+        <div className="grid grid-cols-3 sm:flex items-center gap-1.5">
           <button
             onClick={() => setShowCalendarModal(true)}
-            className="flex items-center space-x-1 py-1.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold transition-all active:scale-95"
+            className="flex items-center justify-center space-x-1 py-2 sm:py-1.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold transition-all active:scale-95"
             title="Google veya Apple Takvimine Ekle"
           >
-            <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+            <Calendar className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
             <span>Takvim</span>
           </button>
 
           <button
             onClick={() => setShowAttendanceModal(true)}
-            className="flex items-center space-x-1 py-1.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold transition-all active:scale-95"
+            className="flex items-center justify-center space-x-1 py-2 sm:py-1.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold transition-all active:scale-95"
           >
-            <CheckCircle2 className="w-3.5 h-3.5 text-amber-400" />
+            <CheckCircle2 className="w-3.5 h-3.5 text-amber-400 shrink-0" />
             <span>Yoklama</span>
           </button>
 
           <button
             onClick={() => setShowResultsModal(true)}
-            className="flex items-center space-x-1 py-1.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-black shadow-md shadow-amber-500/20 transition-all active:scale-95"
+            className="flex items-center justify-center space-x-1 py-2 sm:py-1.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-black shadow-md shadow-amber-500/20 transition-all active:scale-95"
           >
-            <Trophy className="w-3.5 h-3.5" />
+            <Trophy className="w-3.5 h-3.5 shrink-0" />
             <span>Skor & MVP</span>
           </button>
         </div>

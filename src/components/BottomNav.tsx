@@ -21,7 +21,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab })
       id: 'squad' as TabType,
       label: 'Kadro',
       icon: Users2,
-      badge: `${currentMatch.squad.length}/14`,
+      badge: `${currentMatch.squad.length}/${currentMatch.targetSquadCount || 14}`,
     },
     { id: 'players' as TabType, label: 'Havuz', icon: ShieldAlert },
     {
@@ -35,7 +35,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab })
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-30 bg-slate-900/95 backdrop-blur-lg border-t border-slate-800 pb-safe md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-xl border-t border-slate-800 pb-safe md:hidden">
       <div className="w-full max-w-2xl lg:max-w-3xl mx-auto grid grid-cols-5 h-16 px-2 sm:px-4">
         {tabs.map(tab => {
           const Icon = tab.icon;

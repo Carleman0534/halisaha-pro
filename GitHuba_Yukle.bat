@@ -13,12 +13,13 @@ echo.
 
 set "PATH=%LOCALAPPDATA%\Programs\MinGit\cmd;%LOCALAPPDATA%\Programs\GCM;%PATH%"
 
-cd /d "C:\Users\user\Desktop\halisaha-pro-main"
+cd /d "%~dp0"
 
 git branch -M main
 git add .
-git commit -m "feat: half-page pull-down shade proportion for clear and crisp readability" >nul 2>&1
-git push -u origin main --force
+git commit -m "feat: responsive mobile app and desktop web layout" >nul 2>&1
+git pull --rebase origin main
+git push -u origin main
 
 echo.
 if %ERRORLEVEL% EQU 0 (

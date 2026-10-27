@@ -86,7 +86,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'squad' as TabType,
       label: 'Kadro & Taktik',
       icon: Users2,
-      badge: `${currentMatch.squad.length}/14`,
+      badge: `${currentMatch.squad.length}/${currentMatch.targetSquadCount || 14}`,
     },
     { id: 'players' as TabType, label: 'Oyuncu Havuzu', icon: ShieldAlert },
     {
@@ -102,9 +102,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <>
       {/* ============================================================== */}
-      {/* SABİT DİK SOL SÜTUN (SIDEBAR) — HEM TELEFONDA HEM BİLGİSAYARDA */}
+      {/* SABİT DİK SOL SÜTUN (SIDEBAR) — SADECE BİLGİSAYARDA (md+)      */}
       {/* ============================================================== */}
-      <aside className="flex fixed top-0 left-0 bottom-0 w-64 lg:w-72 bg-slate-900/98 border-r border-slate-800 z-40 flex-col justify-between p-4 shadow-xl select-none">
+      <aside className="hidden md:flex fixed top-0 left-0 bottom-0 w-64 lg:w-72 bg-slate-900/98 border-r border-slate-800 z-40 flex-col justify-between p-4 shadow-xl select-none">
         {/* ÜST BÖLÜM: MARKA, HAFTA & KONTROL PANELİ AÇMA BUTONU */}
         <div className="space-y-4">
           <button

@@ -124,10 +124,10 @@ export const Header: React.FC<HeaderProps> = ({ onOpenFirebaseModal }) => {
               <button
                 onClick={handleDirectLogout}
                 title="Oturumu Kapat ve Misafir Moduna Dön"
-                className="flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 hover:text-rose-100 text-xs sm:text-sm font-bold transition-all active:scale-95 shrink-0"
+                className="flex items-center space-x-1 sm:space-x-1.5 p-2 sm:px-3 sm:py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 hover:text-rose-100 text-xs sm:text-sm font-bold transition-all active:scale-95 shrink-0"
               >
                 <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-400" />
-                <span>Çıkış</span>
+                <span className="hidden sm:inline">Çıkış</span>
               </button>
             </>
           ) : (
@@ -139,20 +139,21 @@ export const Header: React.FC<HeaderProps> = ({ onOpenFirebaseModal }) => {
               <button
                 onClick={() => handleOpenAuth('admin')}
                 title="Yönetici (Konsey) Girişine Geç"
-                className="flex items-center space-x-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black text-xs sm:text-sm font-black shadow-lg shadow-amber-500/25 transition-all active:scale-95 shrink-0 border border-amber-300 animate-pulse"
+                className="flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black text-xs sm:text-sm font-black shadow-lg shadow-amber-500/25 transition-all active:scale-95 shrink-0 border border-amber-300"
               >
                 <Crown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-black shrink-0" />
-                <span>Yöneticiye Geç</span>
+                <span className="sm:hidden">Yönetici</span>
+                <span className="hidden sm:inline">Yöneticiye Geç</span>
               </button>
 
               {/* Button 2: Oyuncu Seç */}
               <button
                 onClick={() => handleOpenAuth('guest')}
                 title="Oyuncu veya Misafir Olarak Giriş Yap"
-                className="flex items-center space-x-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs sm:text-sm font-bold transition-all active:scale-95 shrink-0"
+                className="flex items-center space-x-1 px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs sm:text-sm font-bold transition-all active:scale-95 shrink-0"
               >
                 <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-400 shrink-0" />
-                <span className="hidden xs:inline">Oyuncu Seç</span>
+                <span>Oyuncu</span>
                 <ChevronDown className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-400" />
               </button>
             </>

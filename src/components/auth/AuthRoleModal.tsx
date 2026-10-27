@@ -188,7 +188,7 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
       {/* ========================================================================= */}
       <div
         onClick={e => e.stopPropagation()}
-        className="w-full md:w-[50vw] max-w-2xl bg-slate-900 border-b-2 border-emerald-500/50 rounded-b-3xl shadow-2xl shadow-black/95 flex flex-col max-h-[62vh] overflow-hidden animate-phone-shade-down ring-1 ring-slate-700/60"
+        className="w-full md:w-[50vw] max-w-2xl bg-slate-900 border-b-2 border-emerald-500/50 rounded-b-3xl shadow-2xl shadow-black/95 flex flex-col max-h-[82vh] md:max-h-[68vh] overflow-hidden animate-phone-shade-down ring-1 ring-slate-700/60"
       >
         {/* SHADE TOP BAR */}
         <div className="p-3.5 sm:p-4 border-b border-slate-800 bg-slate-900/98 shrink-0 space-y-2.5">
