@@ -1284,14 +1284,14 @@ ${generalDecline}
                       <button
                         onClick={() => handleSendPlayerNotification(p)}
                         title="Oyuncunun telefonuna maça gelip gelmeyeceğini soran bildirim gönder (Cevap verene kadar statüsü Bekliyor kalır)"
-                        className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-[10px] font-black border transition-all active:scale-95 ${
+                        className={`flex items-center space-x-1 px-2 py-1 rounded-lg text-[10px] font-black border transition-all active:scale-95 ${
                           isWaitingNotificationResponse
                             ? 'bg-amber-500/25 text-amber-200 border-amber-400/60 hover:bg-amber-500/35'
                             : 'bg-blue-600/25 hover:bg-blue-600/40 text-blue-200 border-blue-500/50 shadow-sm'
                         }`}
                       >
                         <BellRing className="w-3 h-3 text-amber-400 shrink-0" />
-                        <span>{isWaitingNotificationResponse ? 'Tekrar Bildirim At' : 'Bildirim Gönder'}</span>
+                        <span>Sor</span>
                       </button>
 
                       {/* Coming Player In-match Payment & IBAN Actions */}
@@ -1328,7 +1328,7 @@ ${generalDecline}
                         className="flex items-center space-x-1 px-2 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold transition-all active:scale-95"
                       >
                         <MessageCircle className="w-3 h-3" />
-                        <span>WP Sor</span>
+                        <span>Sor</span>
                       </button>
 
                       {/* 4 Manual Attendance Status Buttons for Admin / Council */}
