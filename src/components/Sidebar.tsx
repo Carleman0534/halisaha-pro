@@ -21,6 +21,7 @@ import { TabType } from './BottomNav';
 import { AuthRoleModal } from './auth/AuthRoleModal';
 import { NotificationModal } from './common/NotificationModal';
 import { getNotificationPermission } from '../services/notifications';
+import { canViewMatchDetails } from '../utils/permissions';
 import { AppUser } from '../types';
 
 interface SidebarProps {
@@ -80,24 +81,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ? 'Oyuncu'
       : 'Misafir';
 
-  const navTabs = [
-    { id: 'matches' as TabType, label: 'Maçlar', icon: CalendarDays },
+  const canSeeDetails = canViewMatchDetails(currentUser, currentMatch);
+
+  const allNavTabs = [
+    { id: 'matches' as TabType, label: 'Maçlar', icon: CalendarDays, councilOnly: false },
     {
       id: 'squad' as TabType,
       label: 'Kadro & Taktik',
       icon: Users2,
-      badge: `${currentMatch.squad.length}/${currentMatch.targetSquadCount || 14}`,
+      badge: canSeeDetails ? `${currentMatch.squad.length}/${currentMatch.targetSquadCount || 14}` : undefined,
+      councilOnly: false,
     },
-    { id: 'players' as TabType, label: 'Oyuncu Havuzu', icon: ShieldAlert },
+    { id: 'players' as TabType, label: 'Oyuncu Havuzu', icon: ShieldAlert, councilOnly: true },
     {
       id: 'finance' as TabType,
       label: 'Finans & Kasa',
       icon: Wallet,
       badge: unpaidCount > 0 ? `${unpaidCount}` : undefined,
       badgeColor: 'bg-rose-500',
+      councilOnly: true,
     },
-    { id: 'rules' as TabType, label: 'Konsey Kuralları', icon: BookOpen },
+    { id: 'rules' as TabType, label: 'Konsey Kuralları', icon: BookOpen, councilOnly: false },
   ];
+
+  const navTabs = isCouncil ? allNavTabs : allNavTabs.filter(t => !t.councilOnly);
 
   return (
     <>
@@ -176,31 +183,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
             })}
           </nav>
 
-          {/* TEK TIKLA HIZLI YÖNETİCİ GEÇİŞ ÇİPLERİ */}
-          <div className="p-2.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1.5">
-            <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-              <span>⚡ Hızlı Giriş</span>
-              <span className="text-slate-400 font-normal">Tek tık</span>
+          {/* TEK TIKLA HIZLI YÖNETİCİ GEÇİŞ ÇİPLERİ (Sadece Konsey/Yönetici) */}
+          {isCouncil && (
+            <div className="p-2.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1.5">
+              <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                <span>⚡ Hızlı Giriş</span>
+                <span className="text-slate-400 font-normal">Tek tık</span>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                {ADMIN_USERS.slice(0, 4).map(admin => {
+                  const isSelected = currentUser.id === admin.id;
+                  return (
+                    <button
+                      key={admin.id}
+                      onClick={() => handleQuickSelectAdmin(admin)}
+                      className={`py-1.5 px-2 rounded-xl text-xs font-bold truncate text-center border transition-all active:scale-95 ${
+                        isSelected
+                          ? 'bg-amber-500 text-black border-amber-400 shadow-sm'
+                          : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white'
+                      }`}
+                    >
+                      👑 {admin.name.split(' ')[0]}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-1.5">
-              {ADMIN_USERS.slice(0, 4).map(admin => {
-                const isSelected = currentUser.id === admin.id;
-                return (
-                  <button
-                    key={admin.id}
-                    onClick={() => handleQuickSelectAdmin(admin)}
-                    className={`py-1.5 px-2 rounded-xl text-xs font-bold truncate text-center border transition-all active:scale-95 ${
-                      isSelected
-                        ? 'bg-amber-500 text-black border-amber-400 shadow-sm'
-                        : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white'
-                    }`}
-                  >
-                    👑 {admin.name.split(' ')[0]}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          )}
         </div>
 
         {/* ALT BÖLÜM: AKTİF KULLANICI KARTI, DOĞRUDAN ÇIKIŞ & SİSTEM KONTROLLERİ */}
@@ -260,17 +269,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
               )}
             </button>
 
-            <button
-              onClick={onOpenFirebaseModal}
-              title={firebaseActive ? 'Firebase Bağlı' : 'Yerel Depolama (Firebase için tıklayın)'}
-              className={`p-2 rounded-xl border transition-all shrink-0 ${
-                firebaseActive
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
-                  : 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20'
-              }`}
-            >
-              <Database className="w-4 h-4" />
-            </button>
+            {isCouncil && (
+              <button
+                onClick={onOpenFirebaseModal}
+                title={firebaseActive ? 'Firebase Bağlı' : 'Yerel Depolama (Firebase için tıklayın)'}
+                className={`p-2 rounded-xl border transition-all shrink-0 ${
+                  firebaseActive
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+                    : 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20'
+                }`}
+              >
+                <Database className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </aside>

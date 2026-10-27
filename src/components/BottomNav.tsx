@@ -1,6 +1,7 @@
 import React from 'react';
 import { CalendarDays, Users2, ShieldAlert, Wallet, BookOpen } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { canViewMatchDetails } from '../utils/permissions';
 
 export type TabType = 'matches' | 'squad' | 'players' | 'finance' | 'rules';
 
@@ -10,33 +11,42 @@ interface BottomNavProps {
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab }) => {
-  const { currentMatch } = useApp();
+  const { currentMatch, currentUser, isCouncil } = useApp();
 
   // Count unpaid players in current match
   const unpaidCount = currentMatch.squad.filter(id => !currentMatch.payments[id]?.isPaid).length;
+  const canSeeDetails = canViewMatchDetails(currentUser, currentMatch);
 
-  const tabs = [
-    { id: 'matches' as TabType, label: 'Maçlar', icon: CalendarDays },
+  const allTabs = [
+    { id: 'matches' as TabType, label: 'Maçlar', icon: CalendarDays, councilOnly: false },
     {
       id: 'squad' as TabType,
       label: 'Kadro',
       icon: Users2,
-      badge: `${currentMatch.squad.length}/${currentMatch.targetSquadCount || 14}`,
+      badge: canSeeDetails ? `${currentMatch.squad.length}/${currentMatch.targetSquadCount || 14}` : undefined,
+      councilOnly: false,
     },
-    { id: 'players' as TabType, label: 'Havuz', icon: ShieldAlert },
+    { id: 'players' as TabType, label: 'Havuz', icon: ShieldAlert, councilOnly: true },
     {
       id: 'finance' as TabType,
       label: 'Finans',
       icon: Wallet,
       badge: unpaidCount > 0 ? `${unpaidCount}` : undefined,
       badgeColor: 'bg-rose-500',
+      councilOnly: true,
     },
-    { id: 'rules' as TabType, label: 'Konsey', icon: BookOpen },
+    { id: 'rules' as TabType, label: 'Konsey', icon: BookOpen, councilOnly: false },
   ];
+
+  const tabs = isCouncil ? allTabs : allTabs.filter(t => !t.councilOnly);
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-xl border-t border-slate-800 pb-safe md:hidden">
-      <div className="w-full max-w-2xl lg:max-w-3xl mx-auto grid grid-cols-5 h-16 px-2 sm:px-4">
+      <div
+        className={`w-full max-w-2xl lg:max-w-3xl mx-auto grid ${
+          isCouncil ? 'grid-cols-5' : 'grid-cols-3'
+        } h-16 px-2 sm:px-4`}
+      >
         {tabs.map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;

@@ -293,7 +293,9 @@ export const EmergencySubstituteFinder: React.FC<EmergencySubstituteFinderProps>
   // Filtered players list for the active view
   const displayPlayers = useMemo(() => {
     let list: Player[] = [];
-    if (activeFilter === 'all') {
+    if (!isCouncil) {
+      list = categorizedPlayers.geliyor;
+    } else if (activeFilter === 'all') {
       list = players;
     } else if (activeFilter === 'geliyor') {
       list = categorizedPlayers.geliyor;
@@ -315,7 +317,7 @@ export const EmergencySubstituteFinder: React.FC<EmergencySubstituteFinderProps>
     }
 
     return list;
-  }, [activeFilter, players, categorizedPlayers, selectedPositionFilter, searchQuery]);
+  }, [isCouncil, activeFilter, players, categorizedPlayers, selectedPositionFilter, searchQuery]);
 
   const matchMapsUrl = useMemo(() => getMatchMapsUrl(currentMatch), [currentMatch]);
 
@@ -703,57 +705,86 @@ ${generalDecline}
         </div>
 
         {/* Quick Action Buttons */}
-        <div className="grid grid-cols-3 gap-2 mt-3">
-          <button
-            onClick={() => setShowBroadcastModal(true)}
-            className="flex items-center justify-center space-x-1.5 py-2 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 transition-all active:scale-95"
-          >
-            <Share2 className="w-3.5 h-3.5" />
-            <span>Acil Çağrı</span>
-          </button>
+        {isCouncil ? (
+          <>
+            <div className="grid grid-cols-3 gap-2 mt-3">
+              <button
+                onClick={() => setShowBroadcastModal(true)}
+                className="flex items-center justify-center space-x-1.5 py-2 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 transition-all active:scale-95"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                <span>Acil Çağrı</span>
+              </button>
 
-          <button
-            onClick={() => setShowVisualCardModal(true)}
-            className="flex items-center justify-center space-x-1.5 py-2 px-2 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-black text-xs shadow-md shadow-emerald-600/20 transition-all active:scale-95"
-          >
-            <span>📸 Görsel Kadro</span>
-          </button>
+              <button
+                onClick={() => setShowVisualCardModal(true)}
+                className="flex items-center justify-center space-x-1.5 py-2 px-2 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-black text-xs shadow-md shadow-emerald-600/20 transition-all active:scale-95"
+              >
+                <span>📸 Görsel Kadro</span>
+              </button>
 
-          <button
-            onClick={() => setShowDebtReminderModal(true)}
-            className="flex items-center justify-center space-x-1.5 py-2 px-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-black font-black text-xs shadow-md shadow-amber-500/20 transition-all active:scale-95"
-          >
-            <Wallet className="w-3.5 h-3.5 text-black" />
-            <span>💬 Kasa Hatırlat</span>
-          </button>
-        </div>
+              <button
+                onClick={() => setShowDebtReminderModal(true)}
+                className="flex items-center justify-center space-x-1.5 py-2 px-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-black font-black text-xs shadow-md shadow-amber-500/20 transition-all active:scale-95"
+              >
+                <Wallet className="w-3.5 h-3.5 text-black" />
+                <span>💬 Kasa Hatırlat</span>
+              </button>
+            </div>
 
-        {/* 2nd Row: Skor, MVP Oylaması, Gol Krallığı */}
-        <div className="grid grid-cols-3 gap-2 mt-2">
-          <button
-            onClick={() => setShowResultsModal(true)}
-            className="flex items-center justify-center space-x-1.5 py-2 px-2 rounded-xl bg-gradient-to-r from-amber-600/30 to-orange-600/30 hover:from-amber-600/40 hover:to-orange-600/40 text-amber-300 border border-amber-500/40 font-bold text-xs transition-all active:scale-95"
-          >
-            <Trophy className="w-3.5 h-3.5 text-amber-400" />
-            <span>Skor & Karne</span>
-          </button>
+            {/* 2nd Row: Skor, MVP Oylaması, Gol Krallığı */}
+            <div className="grid grid-cols-3 gap-2 mt-2">
+              <button
+                onClick={() => setShowResultsModal(true)}
+                className="flex items-center justify-center space-x-1.5 py-2 px-2 rounded-xl bg-gradient-to-r from-amber-600/30 to-orange-600/30 hover:from-amber-600/40 hover:to-orange-600/40 text-amber-300 border border-amber-500/40 font-bold text-xs transition-all active:scale-95"
+              >
+                <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                <span>Skor & Karne</span>
+              </button>
 
-          <button
-            onClick={() => setShowMvpModal(true)}
-            className="flex items-center justify-center space-x-1.5 py-2 px-2 rounded-xl bg-gradient-to-r from-yellow-600/30 to-amber-600/30 hover:from-yellow-600/40 hover:to-amber-600/40 text-yellow-300 border border-yellow-500/40 font-bold text-xs transition-all active:scale-95"
-          >
-            <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
-            <span>MVP Oyla</span>
-          </button>
+              <button
+                onClick={() => setShowMvpModal(true)}
+                className="flex items-center justify-center space-x-1.5 py-2 px-2 rounded-xl bg-gradient-to-r from-yellow-600/30 to-amber-600/30 hover:from-yellow-600/40 hover:to-amber-600/40 text-yellow-300 border border-yellow-500/40 font-bold text-xs transition-all active:scale-95"
+              >
+                <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
+                <span>MVP Oyla</span>
+              </button>
 
-          <button
-            onClick={() => setShowLeaderboardModal(true)}
-            className="flex items-center justify-center space-x-1.5 py-2 px-2 rounded-xl bg-gradient-to-r from-emerald-600/30 to-teal-600/30 hover:from-emerald-600/40 hover:to-teal-600/40 text-emerald-300 border border-emerald-500/40 font-bold text-xs transition-all active:scale-95"
-          >
-            <Flame className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Gol Krallığı</span>
-          </button>
-        </div>
+              <button
+                onClick={() => setShowLeaderboardModal(true)}
+                className="flex items-center justify-center space-x-1.5 py-2 px-2 rounded-xl bg-gradient-to-r from-emerald-600/30 to-teal-600/30 hover:from-emerald-600/40 hover:to-teal-600/40 text-emerald-300 border border-emerald-500/40 font-bold text-xs transition-all active:scale-95"
+              >
+                <Flame className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Gol Krallığı</span>
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="grid grid-cols-3 gap-2 mt-3">
+            <button
+              onClick={() => setShowVisualCardModal(true)}
+              className="flex items-center justify-center space-x-1.5 py-2 px-2 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-black text-xs shadow-md shadow-emerald-600/20 transition-all active:scale-95"
+            >
+              <span>📸 Görsel Kadro</span>
+            </button>
+
+            <button
+              onClick={() => setShowMvpModal(true)}
+              className="flex items-center justify-center space-x-1.5 py-2 px-2 rounded-xl bg-gradient-to-r from-yellow-600/30 to-amber-600/30 hover:from-yellow-600/40 hover:to-amber-600/40 text-yellow-300 border border-yellow-500/40 font-bold text-xs transition-all active:scale-95"
+            >
+              <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
+              <span>MVP Oyla</span>
+            </button>
+
+            <button
+              onClick={() => setShowLeaderboardModal(true)}
+              className="flex items-center justify-center space-x-1.5 py-2 px-2 rounded-xl bg-gradient-to-r from-emerald-600/30 to-teal-600/30 hover:from-emerald-600/40 hover:to-teal-600/40 text-emerald-300 border border-emerald-500/40 font-bold text-xs transition-all active:scale-95"
+            >
+              <Flame className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Gol Krallığı</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 1.5 CANLI MAÇ GÜNÜ HAVA DURUMU WIDGET */}
@@ -763,7 +794,8 @@ ${generalDecline}
         venueName={currentMatch.venueName}
       />
 
-      {/* 2. 1 GÜN ÖNCE MAÇ TEYİT & BİLDİRİM SİSTEMİ (H-24) */}
+      {/* 2. 1 GÜN ÖNCE MAÇ TEYİT & BİLDİRİM SİSTEMİ (H-24) — Sadece Konsey/Yönetici */}
+      {isCouncil && (
       <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-950/40 via-slate-900 to-slate-900 border border-amber-500/30 space-y-3 shadow-lg">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
@@ -835,8 +867,10 @@ ${generalDecline}
           </button>
         </div>
       </div>
+      )}
 
-      {/* 3. BU MAÇA ÖZEL KASA & IBAN DUYURUSU */}
+      {/* 3. BU MAÇA ÖZEL KASA & IBAN DUYURUSU — Sadece Konsey/Yönetici */}
+      {isCouncil && (
       <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-900 border border-emerald-500/30 space-y-3 shadow-lg">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
@@ -913,9 +947,10 @@ ${generalDecline}
           </div>
         </div>
       </div>
+      )}
 
-      {/* 3. MEVKİ EKSİKLERİ & AKILLI YEDEK ÖNERİLERİ (Eğer Eksik Varsa) */}
-      {missingCount > 0 && (
+      {/* 3. MEVKİ EKSİKLERİ & AKILLI YEDEK ÖNERİLERİ (Sadece Konsey/Yönetici) */}
+      {isCouncil && missingCount > 0 && (
         <div className="p-3.5 rounded-2xl bg-gradient-to-r from-rose-950/40 via-slate-900 to-slate-900 border border-rose-500/30 space-y-3 shadow-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -1044,7 +1079,7 @@ ${generalDecline}
           <div className="flex items-center space-x-2">
             <Users className="w-4 h-4 text-emerald-400" />
             <h3 className="text-xs font-black text-white uppercase tracking-wider">
-              Oyuncu Durumları (45 Kişilik Havuz)
+              {isCouncil ? 'Oyuncu Durumları (45 Kişilik Havuz)' : `Maça Katılacak Kadro (${comingCount} Kişi)`}
             </h3>
           </div>
         </div>
@@ -1065,63 +1100,65 @@ ${generalDecline}
           </button>
         )}
 
-        {/* Filter Tabs */}
-        <div className="grid grid-cols-5 gap-1 p-1 bg-slate-950 rounded-xl border border-slate-800 text-xs">
-          <button
-            onClick={() => setActiveFilter('bekleniyor')}
-            className={`py-1.5 px-1 rounded-lg font-bold text-center transition-all ${
-              activeFilter === 'bekleniyor'
-                ? 'bg-amber-500 text-black shadow-md'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Beklenen ({categorizedPlayers.bekleniyor.length})
-          </button>
+        {/* Filter Tabs (Sadece Konsey/Yönetici) */}
+        {isCouncil && (
+          <div className="grid grid-cols-5 gap-1 p-1 bg-slate-950 rounded-xl border border-slate-800 text-xs">
+            <button
+              onClick={() => setActiveFilter('bekleniyor')}
+              className={`py-1.5 px-1 rounded-lg font-bold text-center transition-all ${
+                activeFilter === 'bekleniyor'
+                  ? 'bg-amber-500 text-black shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Beklenen ({categorizedPlayers.bekleniyor.length})
+            </button>
 
-          <button
-            onClick={() => setActiveFilter('geliyor')}
-            className={`py-1.5 px-1 rounded-lg font-bold text-center transition-all ${
-              activeFilter === 'geliyor'
-                ? 'bg-emerald-500 text-black shadow-md'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Gelen ({comingCount})
-          </button>
+            <button
+              onClick={() => setActiveFilter('geliyor')}
+              className={`py-1.5 px-1 rounded-lg font-bold text-center transition-all ${
+                activeFilter === 'geliyor'
+                  ? 'bg-emerald-500 text-black shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Gelen ({comingCount})
+            </button>
 
-          <button
-            onClick={() => setActiveFilter('gelemiyor')}
-            className={`py-1.5 px-1 rounded-lg font-bold text-center transition-all ${
-              activeFilter === 'gelemiyor'
-                ? 'bg-rose-500 text-white shadow-md'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Gelemeyen ({categorizedPlayers.gelemiyor.length})
-          </button>
+            <button
+              onClick={() => setActiveFilter('gelemiyor')}
+              className={`py-1.5 px-1 rounded-lg font-bold text-center transition-all ${
+                activeFilter === 'gelemiyor'
+                  ? 'bg-rose-500 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Gelemeyen ({categorizedPlayers.gelemiyor.length})
+            </button>
 
-          <button
-            onClick={() => setActiveFilter('satti')}
-            className={`py-1.5 px-1 rounded-lg font-bold text-center transition-all ${
-              activeFilter === 'satti'
-                ? 'bg-rose-600 text-white shadow-md animate-pulse'
-                : 'text-rose-400 hover:text-white'
-            }`}
-          >
-            Sattı 🚨 ({sattiCount})
-          </button>
+            <button
+              onClick={() => setActiveFilter('satti')}
+              className={`py-1.5 px-1 rounded-lg font-bold text-center transition-all ${
+                activeFilter === 'satti'
+                  ? 'bg-rose-600 text-white shadow-md animate-pulse'
+                  : 'text-rose-400 hover:text-white'
+              }`}
+            >
+              Sattı 🚨 ({sattiCount})
+            </button>
 
-          <button
-            onClick={() => setActiveFilter('all')}
-            className={`py-1.5 px-1 rounded-lg font-bold text-center transition-all ${
-              activeFilter === 'all'
-                ? 'bg-slate-700 text-white shadow-md'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Tümü ({players.length})
-          </button>
-        </div>
+            <button
+              onClick={() => setActiveFilter('all')}
+              className={`py-1.5 px-1 rounded-lg font-bold text-center transition-all ${
+                activeFilter === 'all'
+                  ? 'bg-slate-700 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Tümü ({players.length})
+            </button>
+          </div>
+        )}
 
         {/* Search & Position Filter */}
         <div className="flex items-center space-x-2">
@@ -1236,23 +1273,23 @@ ${generalDecline}
                             Joker
                           </span>
                         )}
-                        {isWaitingNotificationResponse && (
+                        {isCouncil && isWaitingNotificationResponse && (
                           <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold flex items-center space-x-1">
                             <BellRing className="w-2.5 h-2.5 text-amber-400 animate-pulse" />
                             <span>Haber Bekleniyor (Bildirim Gönderildi)</span>
                           </span>
                         )}
-                        {reqInfo?.status === 'responded' && !isPending && (
+                        {isCouncil && reqInfo?.status === 'responded' && !isPending && (
                           <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold">
                             📱 Bildirime Yanıt Verdi
                           </span>
                         )}
-                        {isSatti && (
+                        {isCouncil && isSatti && (
                           <span className="text-[9px] px-1.5 py-0.2 rounded bg-rose-600/30 text-rose-300 border border-rose-500/40 font-black">
                             🚨 SATTI (-15 P)
                           </span>
                         )}
-                        {isComing && (
+                        {(isCouncil || currentUser.playerId === p.id) && isComing && (
                           <span
                             className={`text-[9px] px-1.5 py-0.2 rounded font-bold border ${
                               isPaid
@@ -1274,7 +1311,7 @@ ${generalDecline}
                             </span>
                           </>
                         )}
-                        {p.attendanceStats.penaltyPoints > 0 && (
+                        {isCouncil && p.attendanceStats.penaltyPoints > 0 && (
                           <>
                             <span>•</span>
                             <span className="text-rose-400 font-bold">

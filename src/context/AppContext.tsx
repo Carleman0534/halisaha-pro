@@ -1047,14 +1047,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return nextMatch;
     });
 
-    try {
-      await sendSystemNotification({
-        title: `⚽ ${player.name} — Maça Geliyor musun?`,
-        body: `${currentMatch.matchNumber}. Hafta (${currentMatch.venueName}, ${currentMatch.time}) maçı için katılım onayınız bekleniyor!`,
-        tag: `invite-req-${currentMatch.id}-${playerId}-${Date.now()}`,
-      });
-    } catch {}
-
     return {
       success: true,
       message: `${player.name} adlı oyuncuya katılım bildirimi gönderildi! Cevap verene kadar durumu "Bekliyor" olarak ayarlandı.`,

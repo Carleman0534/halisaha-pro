@@ -268,7 +268,21 @@ export function subscribeToMatchUpdates(
   let unsubscribeFirestore: (() => void) | null = null;
   let unsubscribeActiveMatch: (() => void) | null = null;
   let eventSource: EventSource | null = null;
+  let pollInterval: ReturnType<typeof setInterval> | null = null;
   let isActive = true;
+
+  const checkCloudSync = () => {
+    if (!isActive) return;
+    fetchLatestMatchFromCloudSync().then(cloudData => {
+      if (!isActive || !cloudData || !cloudData.match) return;
+      const localTs = getLocalMatchTimestamp();
+      if (cloudData.ts > localTs) {
+        localStorage.setItem(STORAGE_KEY_MATCH, JSON.stringify(cloudData.match));
+        setLocalMatchTimestamp(cloudData.ts);
+        onUpdate(cloudData.match);
+      }
+    });
+  };
 
   // 1. Initial Cloud Sync check on mount / user switch
   fetchLatestMatchFromCloudSync().then(cloudData => {
@@ -298,6 +312,12 @@ export function subscribeToMatchUpdates(
       } catch {}
     }
   });
+
+  // Periodic poll & focus sync so mobile browsers never miss an incoming "🔔 Sor" notification
+  if (typeof window !== 'undefined') {
+    pollInterval = setInterval(checkCloudSync, 3500);
+    window.addEventListener('focus', checkCloudSync);
+  }
 
   // 2. Live Server-Sent Events (SSE) subscription for real-time cross-device updates
   if (typeof window !== 'undefined' && typeof EventSource !== 'undefined') {
@@ -388,6 +408,9 @@ export function subscribeToMatchUpdates(
 
   return () => {
     isActive = false;
+    if (pollInterval) {
+      clearInterval(pollInterval);
+    }
     if (eventSource) {
       try {
         eventSource.close();
@@ -396,6 +419,7 @@ export function subscribeToMatchUpdates(
     if (unsubscribeActiveMatch) unsubscribeActiveMatch();
     if (unsubscribeFirestore) unsubscribeFirestore();
     if (typeof window !== 'undefined') {
+      window.removeEventListener('focus', checkCloudSync);
       window.removeEventListener('storage', handleStorageEvent);
     }
   };

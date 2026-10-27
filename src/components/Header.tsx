@@ -172,18 +172,20 @@ export const Header: React.FC<HeaderProps> = ({ onOpenFirebaseModal }) => {
             )}
           </button>
 
-          {/* Firebase Status Button */}
-          <button
-            onClick={onOpenFirebaseModal}
-            title={firebaseActive ? 'Firebase Canlı Veritabanı Bağlı' : 'Yerel Depolama (Firebase için tıklayın)'}
-            className={`p-2 sm:p-2.5 rounded-xl border transition-all shrink-0 ${
-              firebaseActive
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
-                : 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20'
-            }`}
-          >
-            <Database className="w-4 h-4" />
-          </button>
+          {/* Firebase Status Button (Sadece Konsey/Yönetici) */}
+          {isCouncil && (
+            <button
+              onClick={onOpenFirebaseModal}
+              title={firebaseActive ? 'Firebase Canlı Veritabanı Bağlı' : 'Yerel Depolama (Firebase için tıklayın)'}
+              className={`p-2 sm:p-2.5 rounded-xl border transition-all shrink-0 ${
+                firebaseActive
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+                  : 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20'
+              }`}
+            >
+              <Database className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
       </header>

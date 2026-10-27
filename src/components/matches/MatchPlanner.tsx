@@ -17,8 +17,11 @@ import {
 import confetti from 'canvas-confetti';
 import { useApp } from '../../context/AppContext';
 import { AttendanceStatus } from '../../types';
+import { canViewMatchDetails } from '../../utils/permissions';
 
 import { EmergencySubstituteFinder } from './EmergencySubstituteFinder';
+import { PlayerAttendanceConfirmCard } from './PlayerAttendanceConfirmCard';
+import { AuthRoleModal } from '../auth/AuthRoleModal';
 import { MatchResultsModal } from './MatchResultsModal';
 import { AddToCalendarModal } from '../common/AddToCalendarModal';
 import { MvpVotingModal } from './MvpVotingModal';
@@ -30,8 +33,17 @@ interface MatchPlannerProps {
 }
 
 export const MatchPlanner: React.FC<MatchPlannerProps> = ({ onNavigateToSquad }) => {
-  const { currentMatch, pastMatches, playersMap, updateAttendance, setMatchScores, createNewMatch, voteMvp } =
-    useApp();
+  const {
+    currentMatch,
+    pastMatches,
+    playersMap,
+    updateAttendance,
+    setMatchScores,
+    createNewMatch,
+    voteMvp,
+    currentUser,
+    isCouncil,
+  } = useApp();
 
   const [activeView, setActiveView] = useState<'upcoming' | 'weeklyArchive'>('upcoming');
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
@@ -39,42 +51,57 @@ export const MatchPlanner: React.FC<MatchPlannerProps> = ({ onNavigateToSquad })
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [showNewMatchModal, setShowNewMatchModal] = useState(false);
   const [showMvpModal, setShowMvpModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   const [newDate, setNewDate] = useState('2026-11-04');
   const [newTime, setNewTime] = useState('21:00 - 22:00');
   const [newCost, setNewCost] = useState(2800);
   const [newVenue, setNewVenue] = useState('Olimpiyat Halı Saha Tesisleri');
 
+  const hasMatchDetailsAccess = canViewMatchDetails(currentUser, currentMatch);
+
+  // Non-council users who are NOT 'Geliyor' / 'Geldi' must NOT see match details
+  if (!hasMatchDetailsAccess) {
+    return (
+      <div className="space-y-4 pb-20">
+        <PlayerAttendanceConfirmCard onOpenAuthModal={() => setShowAuthModal(true)} />
+        {showAuthModal && <AuthRoleModal onClose={() => setShowAuthModal(false)} />}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4 pb-20">
-      {/* SEGMENTED VIEW SWITCHER: ÖNÜMÜZDEKİ MAÇ vs HAFTALIK SEKME & GEÇMİŞ ARŞİVİ */}
-      <div className="grid grid-cols-2 p-1 bg-slate-900 border border-slate-800 rounded-2xl shadow-lg">
-        <button
-          onClick={() => setActiveView('upcoming')}
-          className={`py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center space-x-1.5 ${
-            activeView === 'upcoming'
-              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
-              : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <Flame className="w-3.5 h-3.5 text-amber-300" />
-          <span>{currentMatch.matchNumber}. Hafta (Önümüzdeki Maç)</span>
-        </button>
+      {/* SEGMENTED VIEW SWITCHER: ÖNÜMÜZDEKİ MAÇ vs HAFTALIK SEKME & GEÇMİŞ ARŞİVİ (Sadece Konsey/Yönetici) */}
+      {isCouncil && (
+        <div className="grid grid-cols-2 p-1 bg-slate-900 border border-slate-800 rounded-2xl shadow-lg">
+          <button
+            onClick={() => setActiveView('upcoming')}
+            className={`py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center space-x-1.5 ${
+              activeView === 'upcoming'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Flame className="w-3.5 h-3.5 text-amber-300" />
+            <span>{currentMatch.matchNumber}. Hafta (Önümüzdeki Maç)</span>
+          </button>
 
-        <button
-          onClick={() => setActiveView('weeklyArchive')}
-          className={`py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center space-x-1.5 ${
-            activeView === 'weeklyArchive'
-              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
-              : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <Calendar className="w-3.5 h-3.5 text-emerald-300" />
-          <span>Haftalık Sekme & Geçmiş</span>
-        </button>
-      </div>
+          <button
+            onClick={() => setActiveView('weeklyArchive')}
+            className={`py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center space-x-1.5 ${
+              activeView === 'weeklyArchive'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Calendar className="w-3.5 h-3.5 text-emerald-300" />
+            <span>Haftalık Sekme & Geçmiş</span>
+          </button>
+        </div>
+      )}
 
-      {activeView === 'weeklyArchive' ? (
+      {isCouncil && activeView === 'weeklyArchive' ? (
         <WeeklyArchiveManager onNavigateToSquad={onNavigateToSquad} />
       ) : (
         <>
@@ -84,40 +111,42 @@ export const MatchPlanner: React.FC<MatchPlannerProps> = ({ onNavigateToSquad })
           {/* 3 NUMARALI MODÜL: TARİH, TOPLAM GELEN SAYISI, HABER BEKLENENLER & ACİL ÇAĞRI */}
           <EmergencySubstituteFinder onNavigateToSquad={onNavigateToSquad} />
 
-      {/* Maç Sonu İşlemleri & Takvim Çubuğu */}
-      <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-        <div>
-          <span className="text-xs font-bold text-white block">Maç İşlemleri & Takvim</span>
-          <span className="text-[10px] text-slate-400">Skor, MVP ve takvim entegrasyonu</span>
+      {/* Maç Sonu İşlemleri & Takvim Çubuğu (Sadece Konsey/Yönetici) */}
+      {isCouncil && (
+        <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div>
+            <span className="text-xs font-bold text-white block">Maç İşlemleri & Takvim</span>
+            <span className="text-[10px] text-slate-400">Skor, MVP ve takvim entegrasyonu</span>
+          </div>
+
+          <div className="grid grid-cols-3 sm:flex items-center gap-1.5">
+            <button
+              onClick={() => setShowCalendarModal(true)}
+              className="flex items-center justify-center space-x-1 py-2 sm:py-1.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold transition-all active:scale-95"
+              title="Google veya Apple Takvimine Ekle"
+            >
+              <Calendar className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span>Takvim</span>
+            </button>
+
+            <button
+              onClick={() => setShowAttendanceModal(true)}
+              className="flex items-center justify-center space-x-1 py-2 sm:py-1.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold transition-all active:scale-95"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span>Yoklama</span>
+            </button>
+
+            <button
+              onClick={() => setShowResultsModal(true)}
+              className="flex items-center justify-center space-x-1 py-2 sm:py-1.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-black shadow-md shadow-amber-500/20 transition-all active:scale-95"
+            >
+              <Trophy className="w-3.5 h-3.5 shrink-0" />
+              <span>Skor & MVP</span>
+            </button>
+          </div>
         </div>
-
-        <div className="grid grid-cols-3 sm:flex items-center gap-1.5">
-          <button
-            onClick={() => setShowCalendarModal(true)}
-            className="flex items-center justify-center space-x-1 py-2 sm:py-1.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold transition-all active:scale-95"
-            title="Google veya Apple Takvimine Ekle"
-          >
-            <Calendar className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-            <span>Takvim</span>
-          </button>
-
-          <button
-            onClick={() => setShowAttendanceModal(true)}
-            className="flex items-center justify-center space-x-1 py-2 sm:py-1.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold transition-all active:scale-95"
-          >
-            <CheckCircle2 className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            <span>Yoklama</span>
-          </button>
-
-          <button
-            onClick={() => setShowResultsModal(true)}
-            className="flex items-center justify-center space-x-1 py-2 sm:py-1.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-black shadow-md shadow-amber-500/20 transition-all active:scale-95"
-          >
-            <Trophy className="w-3.5 h-3.5 shrink-0" />
-            <span>Skor & MVP</span>
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* MVP OF THE MATCH (Maçın Adamı) CARD */}
       <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-950/60 via-slate-900 to-slate-900 border border-amber-500/30 space-y-3 shadow-xl">
@@ -190,62 +219,66 @@ export const MatchPlanner: React.FC<MatchPlannerProps> = ({ onNavigateToSquad })
         })()}
       </div>
 
-      {/* Action to create next match */}
-      <div className="flex items-center justify-between px-1">
-        <h3 className="text-sm font-bold text-slate-200">Geçmiş Maçlar & Skorlar</h3>
-        <button
-          onClick={() => setShowNewMatchModal(true)}
-          className="flex items-center space-x-1 text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition-colors"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>Yeni Maç Planla</span>
-        </button>
-      </div>
-
-      {/* Past Matches List */}
-      <div className="space-y-2.5">
-        {pastMatches.map(m => (
-          <div
-            key={m.id}
-            onClick={() => setActiveView('weeklyArchive')}
-            className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-emerald-500/50 transition-all cursor-pointer group"
-          >
-            <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-              <span className="font-semibold text-slate-300 group-hover:text-emerald-400 transition-colors">
-                {m.matchNumber}. Hafta • {new Date(m.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
-              </span>
-              <span className="text-[10px] text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                Detayları Gör ➔
-              </span>
-            </div>
-
-            {/* Scoreboard */}
-            <div className="flex items-center justify-between bg-slate-950/60 rounded-xl p-3 border border-slate-800/60 mb-2">
-              <div className="flex items-center space-x-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-                <span className="text-xs font-bold text-white">{m.teamA.name}</span>
-              </div>
-
-              <div className="flex items-center space-x-2 font-mono font-black text-lg text-white">
-                <span className={m.teamA.score! > m.teamB.score! ? 'text-emerald-400' : ''}>
-                  {m.teamA.score ?? 0}
-                </span>
-                <span className="text-slate-500 text-sm">-</span>
-                <span className={m.teamB.score! > m.teamA.score! ? 'text-emerald-400' : ''}>
-                  {m.teamB.score ?? 0}
-                </span>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <span className="text-xs font-bold text-white">{m.teamB.name}</span>
-                <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-              </div>
-            </div>
-
-            {m.notes && <p className="text-[11px] text-slate-400 italic line-clamp-1">"{m.notes}"</p>}
+      {/* Action to create next match & Past Matches List (Sadece Konsey/Yönetici) */}
+      {isCouncil && (
+        <>
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-sm font-bold text-slate-200">Geçmiş Maçlar & Skorlar</h3>
+            <button
+              onClick={() => setShowNewMatchModal(true)}
+              className="flex items-center space-x-1 text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Yeni Maç Planla</span>
+            </button>
           </div>
-        ))}
-      </div>
+
+          {/* Past Matches List */}
+          <div className="space-y-2.5">
+            {pastMatches.map(m => (
+              <div
+                key={m.id}
+                onClick={() => setActiveView('weeklyArchive')}
+                className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-emerald-500/50 transition-all cursor-pointer group"
+              >
+                <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
+                  <span className="font-semibold text-slate-300 group-hover:text-emerald-400 transition-colors">
+                    {m.matchNumber}. Hafta • {new Date(m.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
+                  </span>
+                  <span className="text-[10px] text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                    Detayları Gör ➔
+                  </span>
+                </div>
+
+                {/* Scoreboard */}
+                <div className="flex items-center justify-between bg-slate-950/60 rounded-xl p-3 border border-slate-800/60 mb-2">
+                  <div className="flex items-center space-x-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                    <span className="text-xs font-bold text-white">{m.teamA.name}</span>
+                  </div>
+
+                  <div className="flex items-center space-x-2 font-mono font-black text-lg text-white">
+                    <span className={m.teamA.score! > m.teamB.score! ? 'text-emerald-400' : ''}>
+                      {m.teamA.score ?? 0}
+                    </span>
+                    <span className="text-slate-500 text-sm">-</span>
+                    <span className={m.teamB.score! > m.teamA.score! ? 'text-emerald-400' : ''}>
+                      {m.teamB.score ?? 0}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-bold text-white">{m.teamB.name}</span>
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                  </div>
+                </div>
+
+                {m.notes && <p className="text-[11px] text-slate-400 italic line-clamp-1">"{m.notes}"</p>}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
       </>
       )}
 

@@ -87,10 +87,26 @@ export function canRatePlayers(user: AppUser): boolean {
 }
 
 /**
+ * Evaluates whether a user is allowed to view match details (date, time, venue, location, squad).
+ * STRICT RULE:
+ * - Council members and Admins can always view all match details.
+ * - Non-council players can ONLY view match details if their status for the match is 'Geliyor' or 'Geldi'.
+ */
+export function canViewMatchDetails(user: AppUser, match: Match): boolean {
+  if (user.role === 'admin' || user.role === 'council_member') {
+    return true;
+  }
+  if (user.playerId) {
+    const status = match.attendance?.[user.playerId];
+    return status === 'Geliyor' || status === 'Geldi';
+  }
+  return false;
+}
+
+/**
  * Evaluates squad / roster access per requirements:
  * - Council members can view all weeks' squads regardless of participation status
- * - Guests and normal players can only view the squad of weeks they are invited to
- * - "Gelmiyorum" participants CANNOT see the squad
+ * - Non-council players can ONLY view the squad if their status is 'Geliyor' or 'Geldi'
  */
 export function canViewRoster(
   user: AppUser,
@@ -101,52 +117,24 @@ export function canViewRoster(
     return { allowed: true };
   }
 
-  // If user is a identified player or guest
   if (user.playerId) {
     const status = match.attendance?.[user.playerId];
-
-    // Explicitly declined: ACCESS DENIED
-    if (
-      status === 'Gelemiyor' ||
-      status === 'Gelmedi' ||
-      status === 'Son dakika iptal' ||
-      status === 'Satış koydu'
-    ) {
-      return {
-        allowed: false,
-        reason:
-          'Bu haftaki maça katılmayacağınızı bildirdiğiniz için kadro detayları gizlenmiştir. Katılım durumunuzu "Geliyorum" olarak güncelleyerek kadroya yeniden erişebilirsiniz.',
-      };
-    }
-
-    // Explicitly confirmed coming or awaiting confirmation
-    if (
-      status === 'Geliyor' ||
-      status === 'Geldi' ||
-      status === 'Beklemede' ||
-      status === 'Haber Bekleniyor'
-    ) {
-      return { allowed: true };
-    }
-
-    // Check if player is already included in squad
-    if (match.squad && match.squad.includes(user.playerId)) {
-      return { allowed: true };
-    }
-
-    // If viewing the current upcoming match, allow pending invitees
-    if (match.status === 'teams_formed' || match.status === 'scheduled') {
+    if (status === 'Geliyor' || status === 'Geldi') {
       return { allowed: true };
     }
 
     return {
       allowed: false,
-      reason: 'Yalnızca çağrıldığınız haftanın kadrosuna erişim yetkiniz bulunmaktadır.',
+      reason:
+        'Konsey üyesi olmayan oyuncular yalnızca maça "Geliyor" durumunda olduklarında maç ve kadro detaylarını görüntüleyebilir.',
     };
   }
 
-  // General anonymous guest viewer
-  return { allowed: true };
+  return {
+    allowed: false,
+    reason:
+      'Maç ve kadro detayları yalnızca maça katılan ("Geliyor") oyunculara ve Konsey üyelerine açıktır.',
+  };
 }
 
 /**

@@ -18,6 +18,7 @@ import confetti from 'canvas-confetti';
 import { useApp } from '../../context/AppContext';
 import { ADMIN_USERS, DEFAULT_GUEST_USER } from '../../data/initialData';
 import { AppUser, Player } from '../../types';
+import { requestNotificationPermission } from '../../services/notifications';
 
 interface AuthRoleModalProps {
   onClose: () => void;
@@ -162,6 +163,7 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
       playerId: player.id,
     };
     setCurrentUser(playerUser);
+    requestNotificationPermission().catch(() => {});
     try {
       confetti({ particleCount: 25, spread: 50, origin: { y: 0.5 } });
     } catch {}

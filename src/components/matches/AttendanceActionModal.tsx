@@ -5,10 +5,8 @@ import {
   Calendar,
   Clock,
   MapPin,
-  CreditCard,
   Copy,
   Check,
-  Sparkles,
   ArrowRight,
   X,
   BellRing,
@@ -21,6 +19,7 @@ import confetti from 'canvas-confetti';
 import { useApp } from '../../context/AppContext';
 import { isPlayerExemptForMatch } from '../../utils/permissions';
 import { getMatchMapsUrl } from '../../services/firebase';
+import { sendSystemNotification, playNotificationChimeAndVibrate } from '../../services/notifications';
 import { AppUser } from '../../types';
 
 export const AttendanceActionModal: React.FC = () => {
@@ -32,6 +31,7 @@ export const AttendanceActionModal: React.FC = () => {
     updateMatchDetails,
     playersMap,
     players,
+    isCouncil,
   } = useApp();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -121,9 +121,20 @@ export const AttendanceActionModal: React.FC = () => {
 
           // Clean up URL parameters cleanly
           const newUrl = new URL(window.location.href);
-          ['oyuncu', 'player', 'p', 'durum', 'action', 'd', 'mDate', 'mTime', 'mVenue', 'mLoc', 'mCost', 'mNo'].forEach(
-            k => newUrl.searchParams.delete(k)
-          );
+          [
+            'oyuncu',
+            'player',
+            'p',
+            'durum',
+            'action',
+            'd',
+            'mDate',
+            'mTime',
+            'mVenue',
+            'mLoc',
+            'mCost',
+            'mNo',
+          ].forEach(k => newUrl.searchParams.delete(k));
           window.history.replaceState({}, '', newUrl.toString());
           return;
         }
@@ -155,19 +166,42 @@ export const AttendanceActionModal: React.FC = () => {
         return;
       }
 
-      // 3. Fallback: If logged in as player and pending confirmation or new notification request arrived
+      // 3. ONLY show prompt if an Admin/Council member explicitly clicked "🔔 Sor" for THIS player!
       if (currentUser.playerId) {
-        setActivePlayerId(currentUser.playerId);
-        const status = currentMatch.attendance[currentUser.playerId] || 'Haber Bekleniyor';
-        const isPending = status === 'Haber Bekleniyor' || status === 'Beklemede';
-        const req = currentMatch.attendanceRequests?.[currentUser.playerId];
-        const reqStamp = req?.status === 'pending' ? req.requestedAt : 'initial';
-        const dismissedKey = `halisaha_prompt_dismissed_${currentMatch.id}_${currentUser.playerId}`;
+        const myId = currentUser.playerId;
+        const req = currentMatch.attendanceRequests?.[myId];
+        const status = currentMatch.attendance[myId];
+        const isStillPending =
+          !status || status === 'Haber Bekleniyor' || status === 'Beklemede';
 
-        if (isPending && sessionStorage.getItem(dismissedKey) !== reqStamp) {
-          setModalMode('prompt');
-          setIsOpen(true);
+        if (req && req.status === 'pending' && req.requestedAt && isStillPending) {
+          setActivePlayerId(myId);
+
+          // Trigger phone notification + sound + vibration ONCE for this specific request timestamp
+          const notifiedKey = `halisaha_notified_${currentMatch.id}_${myId}`;
+          if (localStorage.getItem(notifiedKey) !== req.requestedAt) {
+            localStorage.setItem(notifiedKey, req.requestedAt);
+            const myPlayer = playersMap[myId];
+            const myName = myPlayer ? myPlayer.name : currentUser.name;
+            playNotificationChimeAndVibrate();
+            sendSystemNotification({
+              title: `⚽ ${myName} — Maça Geliyor musun?`,
+              body: `${req.requestedBy || 'Konsey'} sizi ${currentMatch.matchNumber}. Hafta maçına davet etti! Katılım durumunuzu seçin.`,
+              tag: `invite-req-${currentMatch.id}-${myId}`,
+            }).catch(() => {});
+          }
+
+          const dismissedKey = `halisaha_prompt_dismissed_${currentMatch.id}_${myId}`;
+          if (sessionStorage.getItem(dismissedKey) !== req.requestedAt) {
+            setModalMode('prompt');
+            setIsOpen(true);
+          }
+        } else {
+          // If no active "🔔 Sor" request for this user, make sure prompt doesn't stay open from another user switch
+          setIsOpen(false);
         }
+      } else {
+        setIsOpen(false);
       }
     } catch (err) {
       console.warn('AttendanceActionModal error:', err);
@@ -176,6 +210,7 @@ export const AttendanceActionModal: React.FC = () => {
     currentUser.playerId,
     currentMatch.id,
     currentMatch.attendanceRequests?.[currentUser.playerId || '']?.requestedAt,
+    currentMatch.attendanceRequests?.[currentUser.playerId || '']?.status,
   ]);
 
   const targetId = activePlayerId || currentUser.playerId;
@@ -207,9 +242,10 @@ export const AttendanceActionModal: React.FC = () => {
   };
 
   const handleClose = () => {
-    const dismissedKey = `halisaha_prompt_dismissed_${currentMatch.id}_${targetId}`;
-    const reqStamp = activeRequest?.status === 'pending' ? activeRequest.requestedAt : 'initial';
-    sessionStorage.setItem(dismissedKey, reqStamp);
+    if (activeRequest?.requestedAt) {
+      const dismissedKey = `halisaha_prompt_dismissed_${currentMatch.id}_${targetId}`;
+      sessionStorage.setItem(dismissedKey, activeRequest.requestedAt);
+    }
     setIsOpen(false);
   };
 
@@ -247,56 +283,38 @@ export const AttendanceActionModal: React.FC = () => {
 
             <div className="space-y-1">
               <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">
-                MAÇ KATILIM TEYİDİ
+                🔔 MAÇ DAVETİ ({activeRequest?.requestedBy || 'Konsey'})
               </span>
               <h3 className="text-lg font-black text-white">
                 Selam {playerName} ⚽🔥
               </h3>
-              <p className="text-xs text-slate-300">
-                Bu haftaki halı saha maçımız için katılım durumunuz bekleniyor. Maça geliyor musunuz?
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Bu haftaki halı saha maçımız için kadroya davet edildiniz. Maça geliyor musunuz?
               </p>
             </div>
 
-            {/* Match Info Pill */}
-            <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-2xl text-left text-xs space-y-2">
-              <div className="flex items-center space-x-2 text-slate-200">
-                <Calendar className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span className="font-bold capitalize">{dateFormatted}</span>
-              </div>
-              <div className="flex items-center space-x-2 text-slate-300">
-                <Clock className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Saat: <strong className="text-white">{currentMatch.time}</strong></span>
-              </div>
-              <div className="flex items-center justify-between gap-2 pt-0.5">
-                <div className="flex items-center space-x-2 text-slate-200 min-w-0">
-                  <MapPin className="w-4 h-4 text-rose-400 shrink-0" />
-                  <div className="truncate">
+            {isCouncil ? (
+              <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-2xl text-left text-xs space-y-2">
+                <div className="flex items-center space-x-2 text-slate-200">
+                  <Calendar className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span className="font-bold capitalize">{dateFormatted}</span>
+                </div>
+                <div className="flex items-center space-x-2 text-slate-300">
+                  <Clock className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Saat: <strong className="text-white">{currentMatch.time}</strong></span>
+                </div>
+                <div className="flex items-center justify-between gap-2 pt-0.5">
+                  <div className="flex items-center space-x-2 text-slate-200 min-w-0">
+                    <MapPin className="w-4 h-4 text-rose-400 shrink-0" />
                     <span className="font-bold text-white block truncate">{currentMatch.venueName}</span>
-                    {currentMatch.venueLocation && currentMatch.venueLocation !== currentMatch.venueName && (
-                      <span className="text-[10px] text-slate-400 block truncate">{currentMatch.venueLocation}</span>
-                    )}
                   </div>
                 </div>
-                <a
-                  href={getMatchMapsUrl(currentMatch)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-2.5 py-1.5 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/40 text-blue-300 text-[11px] font-bold flex items-center space-x-1 shrink-0 transition-all active:scale-95"
-                >
-                  <Navigation className="w-3 h-3 text-blue-400" />
-                  <span>Konum</span>
-                  <ExternalLink className="w-2.5 h-2.5" />
-                </a>
               </div>
-              <div className="flex items-center justify-between pt-1.5 border-t border-slate-800 text-[11px]">
-                <span className="text-slate-400">Kişi Başı Ücret:</span>
-                {exemptionInfo.isExempt ? (
-                  <span className="font-bold text-emerald-400">0 ₺ (🛡️ Muafsınız)</span>
-                ) : (
-                  <span className="font-bold text-amber-400 font-mono">{currentMatch.costPerPlayer} ₺</span>
-                )}
+            ) : (
+              <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-2xl text-xs text-slate-400">
+                🔒 Maça <strong className="text-emerald-400">"Geliyorum"</strong> olarak onay verdiğinizde maç saati, saha konumu ve kadro detayları ekranınızda açılacaktır.
               </div>
-            </div>
+            )}
 
             {/* Action Buttons */}
             <div className="space-y-2 pt-1">
@@ -336,7 +354,7 @@ export const AttendanceActionModal: React.FC = () => {
                 Harika, Kadroya Alındınız! ⚽
               </h3>
               <p className="text-xs text-slate-300">
-                <strong>{playerName}</strong>, maça katılımınız onaylandı ve organizatör yöneticilere bildirildi.
+                <strong>{playerName}</strong>, maça katılımınız onaylandı ve maç detayları erişiminize açıldı.
               </p>
             </div>
 
@@ -373,6 +391,7 @@ export const AttendanceActionModal: React.FC = () => {
                 >
                   <span className="truncate">{currentMatch.venueName}</span>
                   <Navigation className="w-3 h-3 text-blue-400 shrink-0" />
+                  <ExternalLink className="w-2.5 h-2.5 shrink-0" />
                 </a>
               </div>
               <div className="flex justify-between pt-1 border-t border-slate-800">
@@ -409,7 +428,7 @@ export const AttendanceActionModal: React.FC = () => {
                 onClick={handleClose}
                 className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all active:scale-95 flex items-center justify-center space-x-1"
               >
-                <span>Kadroyu ve Takımları İncele</span>
+                <span>Maç Detaylarını ve Kadroyu Gör</span>
                 <ArrowRight className="w-3.5 h-3.5 ml-1" />
               </button>
             </div>
@@ -433,7 +452,7 @@ export const AttendanceActionModal: React.FC = () => {
                 Gelemiyor Olarak Kaydedildi
               </h3>
               <p className="text-xs text-slate-300">
-                <strong>{playerName}</strong>, bu haftaki maça katılamayacağınız sisteme işlendi. Yerinize yedek havuzundan oyuncu çağrılacak.
+                <strong>{playerName}</strong>, bu haftaki maça katılamayacağınız sisteme işlendi.
               </p>
             </div>
 

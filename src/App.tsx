@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { AppProvider } from './context/AppContext';
+import React, { useState, useEffect } from 'react';
+import { AppProvider, useApp } from './context/AppContext';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { BottomNav, TabType } from './components/BottomNav';
@@ -13,8 +13,16 @@ import { PwaInstallPrompt } from './components/common/PwaInstallPrompt';
 import { AttendanceActionModal } from './components/matches/AttendanceActionModal';
 
 const MainLayout: React.FC = () => {
+  const { isCouncil } = useApp();
   const [activeTab, setActiveTab] = useState<TabType>('matches');
   const [showFirebaseModal, setShowFirebaseModal] = useState(false);
+
+  // If user switches to a non-council role while on a restricted tab ('finance' or 'players'), redirect to 'matches'
+  useEffect(() => {
+    if (!isCouncil && (activeTab === 'finance' || activeTab === 'players')) {
+      setActiveTab('matches');
+    }
+  }, [isCouncil, activeTab]);
 
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-slate-950 text-slate-100 flex flex-col md:flex-row selection:bg-emerald-500 selection:text-white">
@@ -34,12 +42,12 @@ const MainLayout: React.FC = () => {
           {/* PWA Install Banner */}
           <PwaInstallPrompt />
 
-          {activeTab === 'matches' && (
+          {(activeTab === 'matches' || (!isCouncil && (activeTab === 'players' || activeTab === 'finance'))) && (
             <MatchPlanner onNavigateToSquad={() => setActiveTab('squad')} />
           )}
           {activeTab === 'squad' && <SquadManager />}
-          {activeTab === 'players' && <PlayerPool />}
-          {activeTab === 'finance' && <FinanceManager />}
+          {isCouncil && activeTab === 'players' && <PlayerPool />}
+          {isCouncil && activeTab === 'finance' && <FinanceManager />}
           {activeTab === 'rules' && <CouncilRules />}
         </div>
       </main>

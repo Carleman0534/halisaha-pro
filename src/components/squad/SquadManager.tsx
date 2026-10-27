@@ -364,7 +364,7 @@ export const SquadManager: React.FC = () => {
             </p>
           </div>
 
-          {currentUser.playerId && (
+          {currentUser.playerId && currentMatch.attendanceRequests?.[currentUser.playerId]?.status === 'pending' && (
             <div className="pt-2">
               <button
                 onClick={() => {
@@ -375,7 +375,7 @@ export const SquadManager: React.FC = () => {
                 }}
                 className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 active:scale-95 transition-all"
               >
-                Katılım Durumumu "Geliyorum" Yap ve Kadroyu Gör
+                Daveti Onayla ("Geliyorum" Yap) ve Kadroyu Gör
               </button>
             </div>
           )}
@@ -409,6 +409,8 @@ export const SquadManager: React.FC = () => {
       )}
 
       {/* HAFTA SEÇİCİ (WEEK SELECTOR) */}
+      {isCouncil && (
+      <>
       <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center space-x-1.5">
@@ -561,7 +563,7 @@ export const SquadManager: React.FC = () => {
       )}
 
       {/* IF VIEWING CURRENT MATCH: GELENLERDEN KADRO ÇEK CARD */}
-      {isViewingCurrent && (
+      {isCouncil && isViewingCurrent && (
         <div className="p-3.5 bg-gradient-to-r from-emerald-950/70 via-slate-900 to-slate-900 border border-emerald-500/30 rounded-2xl flex items-center justify-between shadow-lg">
           <div>
             <span className="text-xs font-black text-white flex items-center space-x-1.5">
@@ -582,6 +584,8 @@ export const SquadManager: React.FC = () => {
             <span>Gelenlerden Kadro Çek ({comingCount})</span>
           </button>
         </div>
+      )}
+      </>
       )}
 
       {/* Guest Mode Notice */}
@@ -606,6 +610,7 @@ export const SquadManager: React.FC = () => {
       )}
 
       {/* MATCH FORMAT SELECTOR (5v5, 6v6, 7v7, 8v8) */}
+      {isCouncil && (
       <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2.5">
         <div className="flex items-center justify-between">
           <span className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center space-x-1.5">
@@ -652,6 +657,7 @@ export const SquadManager: React.FC = () => {
           })}
         </div>
       </div>
+      )}
 
       {/* POWER BALANCE & ACTION BUTTONS */}
       <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">

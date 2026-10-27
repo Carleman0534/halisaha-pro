@@ -32,6 +32,39 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
   }
 }
 
+export function playNotificationChimeAndVibrate(): void {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate([250, 100, 250]);
+    }
+  } catch {}
+
+  try {
+    if (typeof window === 'undefined') return;
+    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return;
+
+    const ctx = new AudioCtx();
+    const now = ctx.currentTime;
+
+    // Two-tone pleasant alert chime (E5 -> A5)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(659.25, now);
+    osc1.frequency.setValueAtTime(880, now + 0.14);
+
+    gain1.gain.setValueAtTime(0.22, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+
+    osc1.start(now);
+    osc1.stop(now + 0.45);
+  } catch {}
+}
+
 export async function sendSystemNotification({
   title,
   body,
@@ -39,6 +72,8 @@ export async function sendSystemNotification({
   badge = '/pwa-192x192.png',
   tag = 'halisaha-alert',
 }: SystemNotificationOptions): Promise<boolean> {
+  playNotificationChimeAndVibrate();
+
   if (!isNotificationSupported()) return false;
 
   if (Notification.permission !== 'granted') {
