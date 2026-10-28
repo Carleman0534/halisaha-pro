@@ -47,6 +47,34 @@ self.addEventListener('message', (event) => {
   }
 });
 
+// Sunucudan gelen Web Push (FCM) bildirimleri — uygulama kapalıyken de çalışır
+self.addEventListener('push', (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    try {
+      payload = { data: { body: event.data.text() } };
+    } catch {}
+  }
+
+  const data = payload.data || {};
+  const note = payload.notification || {};
+  const title = note.title || data.title || '⚽ Halı Saha Pro';
+  const body = note.body || data.body || 'Yeni bir bildiriminiz var.';
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: '/pwa-192x192.png',
+      badge: '/pwa-192x192.png',
+      tag: data.tag || 'halisaha-push',
+      renotify: true,
+      data: { url: data.url || '/' },
+    })
+  );
+});
+
 // Focus or open the app when the user taps on the mobile notification
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
@@ -58,7 +86,7 @@ self.addEventListener('notificationclick', (event) => {
         }
       }
       if (self.clients.openWindow) {
-        return self.clients.openWindow('/');
+        return self.clients.openWindow((event.notification.data && event.notification.data.url) || '/');
       }
     })
   );

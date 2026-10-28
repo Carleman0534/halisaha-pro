@@ -63,6 +63,7 @@ import {
   playNotificationChimeAndVibrate,
   requestNotificationPermission,
 } from '../services/notifications';
+import { sendPushNotification, syncPushRegistration } from '../services/push';
 import { isPlayerExemptForMatch } from '../utils/permissions';
 
 interface AppContextType {
@@ -393,6 +394,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const refreshFirebaseStatus = () => {
     setFirebaseActive(isFirebaseConnected());
   };
+
+  // Telefon bildirim kaydı (Web Push): oyuncu giriş yapınca ya da bildirim izni verince
+  // bu cihazın bildirim adresi (token) sunucuya kaydedilir.
+  useEffect(() => {
+    const pid = currentUser.playerId;
+    if (!pid) return;
+    const register = () => {
+      syncPushRegistration(pid).catch(() => {});
+    };
+    register();
+    window.addEventListener('halisaha:notification-granted', register);
+    return () => window.removeEventListener('halisaha:notification-granted', register);
+  }, [currentUser.playerId]);
 
   // Realtime sync subscription for currentMatch (Firestore & Cross-tab storage)
   useEffect(() => {
@@ -1099,9 +1113,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return next;
     });
 
+    // Uygulama kapalıyken de ulaşması için telefona gerçek push bildirimi gönder
+    const pushRes = await sendPushNotification({
+      type: 'invite',
+      playerId,
+      playerName: player.name,
+      matchId: baseMatch.id,
+      matchNumber: baseMatch.matchNumber,
+      requestedBy: currentUser.name,
+    });
+
+    let pushNote = '';
+    if (pushRes.sent > 0) {
+      pushNote = ' Telefonuna bildirim gönderildi.';
+    } else if (pushRes.reason === 'no_token') {
+      pushNote =
+        ' Ancak bu oyuncu henüz telefon bildirimlerini açmamış; uygulamayı açtığında daveti görecek.';
+    } else if (pushRes.reason === 'rate_limited') {
+      pushNote = ' (Az önce zaten bildirim gönderilmişti.)';
+    } else {
+      pushNote = ' Telefon bildirimi şu an gönderilemedi; oyuncu uygulamayı açtığında daveti görecek.';
+    }
+
     return {
       success: true,
-      message: `${player.name} adlı oyuncuya katılım bildirimi gönderildi! Cevap verene kadar durumu "Bekliyor" olarak ayarlandı.`,
+      message: `${player.name} adlı oyuncuya katılım daveti gönderildi! Cevap verene kadar durumu "Bekliyor" olarak ayarlandı.${pushNote}`,
     };
   };
 
@@ -1184,6 +1220,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     } catch {}
 
+    // 3b. Her bekleyen oyuncunun telefonuna gerçek push bildirimi gönder
+    const pushResults = await Promise.all(
+      pendingPlayers.map(p =>
+        sendPushNotification({
+          type: 'reminder',
+          playerId: p.id,
+          playerName: p.name,
+          matchId: targetMatch.id,
+          matchNumber: targetMatch.matchNumber,
+          requestedBy: currentUser.name,
+        })
+      )
+    );
+    const pushDelivered = pushResults.filter(r => r.sent > 0).length;
+
     // 4. Construct detailed recipient results
     const nowIso = new Date().toISOString();
     const recipients = pendingPlayers.map(p => ({
@@ -1241,7 +1292,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       targetedCount: pendingPlayers.length,
       successfulCount: pendingPlayers.length,
       failedCount: 0,
-      message: `Tebrikler! Yanıt vermeyen ${pendingPlayers.length} oyuncuya tekrar bildirim başarıyla iletildi.`,
+      message: `Yanıt vermeyen ${pendingPlayers.length} oyuncuya tekrar davet gönderildi. Telefon bildirimi ulaşan: ${pushDelivered}/${pendingPlayers.length}. Diğerleri uygulamayı açtığında daveti görecek.`,
       log: dispatchLog,
     };
   };

@@ -25,6 +25,10 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
 
   try {
     const permission = await Notification.requestPermission();
+    if (permission === 'granted' && typeof window !== 'undefined') {
+      // Push kaydının (token) hemen yapılabilmesi için uygulamaya haber ver
+      window.dispatchEvent(new Event('halisaha:notification-granted'));
+    }
     return permission;
   } catch (error) {
     console.error('Error requesting notification permission:', error);
