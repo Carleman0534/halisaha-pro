@@ -1,19 +1,18 @@
-// Vercel Serverless Realtime Sync & Invitation State Endpoint
-// Eliminates browser rate-limits and guarantees instant cross-device sync for "🔔 Sor" invitations
+// Vercel Serverless senkronizasyon endpoint'i.
+// Veri artık sunucu belleğinde DEĞİL, Firestore'da (sync/state belgesi) tutulur;
+// bu yüzden Vercel örnekleri kapanıp açılsa da veri kaybolmaz ve herkes aynı veriyi görür.
+// Gerekli: Vercel > Settings > Environment Variables > FIREBASE_SERVICE_ACCOUNT (push için zaten var).
 
-const NTFY_BACKUP_URL = 'https://ntfy.sh/halisaha_pro_srv_backup_v4';
+import { getDb } from './_lib/admin.js';
 
-if (!globalThis.__HALISAHA_SYNC_STORE__) {
-  globalThis.__HALISAHA_SYNC_STORE__ = {
-    match: null,
-    ts: 0,
-    invites: {},
-    hydrated: false,
-    lastBackupPush: 0,
-  };
+const STATE_PATH = ['sync', 'state'];
+const READ_CACHE_MS = 2000; // Firestore okuma sayısını azaltmak için kısa önbellek
+
+let readCache = { at: 0, state: null };
+
+function emptyState() {
+  return { match: null, ts: 0, invites: {} };
 }
-
-const store = globalThis.__HALISAHA_SYNC_STORE__;
 
 function getInviteTimestamp(inv) {
   if (!inv) return 0;
@@ -22,19 +21,13 @@ function getInviteTimestamp(inv) {
   return inv.status === 'pending' ? reqTs : Math.max(reqTs, respTs);
 }
 
-function mergeInvitesMap(baseInvites = {}, incomingInvites = {}) {
-  const merged = { ...baseInvites };
-  for (const [pid, inc] of Object.entries(incomingInvites)) {
+function mergeInvitesMap(base = {}, incoming = {}) {
+  const merged = { ...base };
+  for (const [pid, inc] of Object.entries(incoming || {})) {
     if (!inc || !inc.playerId) continue;
     const existing = merged[pid];
-    if (!existing) {
-      merged[pid] = inc;
-      continue;
-    }
-    const existingTs = getInviteTimestamp(existing);
-    const incTs = getInviteTimestamp(inc);
-    if (incTs >= existingTs) {
-      merged[pid] = { ...existing, ...inc };
+    if (!existing || getInviteTimestamp(inc) >= getInviteTimestamp(existing)) {
+      merged[pid] = existing ? { ...existing, ...inc } : inc;
     }
   }
   return merged;
@@ -42,108 +35,98 @@ function mergeInvitesMap(baseInvites = {}, incomingInvites = {}) {
 
 function applyInvitesToMatch(match, invites) {
   if (!match || !match.id) return match;
-  const nextAttendance = { ...(match.attendance || {}) };
-  const nextRequests = { ...(match.attendanceRequests || {}) };
-  const nextTimestamps = { ...(match.attendanceTimestamps || {}) };
+  const attendance = { ...(match.attendance || {}) };
+  const requests = { ...(match.attendanceRequests || {}) };
+  const timestamps = { ...(match.attendanceTimestamps || {}) };
 
   for (const [pid, inv] of Object.entries(invites || {})) {
     if (!inv || !inv.playerId) continue;
-    const existingReq = nextRequests[pid];
-    const existingTs = getInviteTimestamp(existingReq);
-    const invTs = getInviteTimestamp(inv);
+    const existingReq = requests[pid];
+    if (existingReq && getInviteTimestamp(inv) < getInviteTimestamp(existingReq)) continue;
 
-    if (!existingReq || invTs >= existingTs) {
-      if (inv.status === 'pending') {
-        nextRequests[pid] = {
-          playerId: pid,
-          requestedAt: inv.requestedAt,
-          requestedBy: inv.requestedBy || 'Konsey',
-          status: 'pending',
-        };
-        nextAttendance[pid] = 'Haber Bekleniyor';
-        nextTimestamps[pid] = inv.requestedAt;
-      } else if (inv.status === 'responded') {
-        nextRequests[pid] = {
-          playerId: pid,
-          requestedAt: inv.requestedAt,
-          requestedBy: inv.requestedBy || 'Konsey',
-          status: 'responded',
-          respondedAt: inv.respondedAt || new Date().toISOString(),
-        };
-        if (inv.responseStatus) {
-          nextAttendance[pid] = inv.responseStatus;
-        }
-        if (inv.respondedAt) {
-          nextTimestamps[pid] = inv.respondedAt;
-        }
-      }
+    if (inv.status === 'pending') {
+      requests[pid] = {
+        playerId: pid,
+        requestedAt: inv.requestedAt,
+        requestedBy: inv.requestedBy || 'Konsey',
+        status: 'pending',
+      };
+      attendance[pid] = 'Haber Bekleniyor';
+      timestamps[pid] = inv.requestedAt;
+    } else if (inv.status === 'responded') {
+      requests[pid] = {
+        playerId: pid,
+        requestedAt: inv.requestedAt,
+        requestedBy: inv.requestedBy || 'Konsey',
+        status: 'responded',
+        respondedAt: inv.respondedAt || new Date().toISOString(),
+      };
+      if (inv.responseStatus) attendance[pid] = inv.responseStatus;
+      if (inv.respondedAt) timestamps[pid] = inv.respondedAt;
     }
   }
+  return { ...match, attendance, attendanceRequests: requests, attendanceTimestamps: timestamps };
+}
 
+// Aynı maç için gelen güncellemede, oyuncu bazında YENİ olan katılım bilgisi kazanır.
+// (Eski bir telefon, eski katılım durumlarıyla yeni durumları ezemez.)
+function mergeSameMatch(current, incoming) {
+  const attendance = { ...(current.attendance || {}) };
+  const timestamps = { ...(current.attendanceTimestamps || {}) };
+  const incAtt = incoming.attendance || {};
+  const incTs = incoming.attendanceTimestamps || {};
+
+  for (const pid of Object.keys(incAtt)) {
+    const curT = Date.parse(timestamps[pid] || '') || 0;
+    const newT = Date.parse(incTs[pid] || '') || 0;
+    if (!(pid in attendance) || newT >= curT) {
+      attendance[pid] = incAtt[pid];
+      if (incTs[pid]) timestamps[pid] = incTs[pid];
+    }
+  }
   return {
-    ...match,
-    attendance: nextAttendance,
-    attendanceRequests: nextRequests,
-    attendanceTimestamps: nextTimestamps,
+    ...incoming,
+    attendance,
+    attendanceTimestamps: timestamps,
+    attendanceRequests: {
+      ...(current.attendanceRequests || {}),
+      ...(incoming.attendanceRequests || {}),
+    },
   };
 }
 
-function shouldReplaceMatch(currentMatch, incomingMatch, currentTs, incomingTs) {
-  if (!currentMatch || !currentMatch.id) return true;
-  if (!incomingMatch || !incomingMatch.id) return false;
-
-  // Never let the default initial match (match_current / week 44) overwrite a newer created match (e.g. match_46)
-  const curIsDefault = currentMatch.id === 'match_current' && (currentMatch.matchNumber || 44) <= 44;
-  const incIsDefault = incomingMatch.id === 'match_current' && (incomingMatch.matchNumber || 44) <= 44;
-
-  if (!curIsDefault && incIsDefault) {
-    return false;
-  }
-  if (curIsDefault && !incIsDefault) {
-    return true;
-  }
-
-  if ((incomingMatch.matchNumber || 0) > (currentMatch.matchNumber || 0)) {
-    return true;
-  }
-  if ((incomingMatch.matchNumber || 0) < (currentMatch.matchNumber || 0)) {
-    return false;
-  }
-
-  return incomingTs >= currentTs;
+function isDefaultMatch(m) {
+  return m && m.id === 'match_current' && (m.matchNumber || 44) <= 44;
 }
 
-async function hydrateFromBackupIfNeeded() {
-  if (store.hydrated) return;
-  store.hydrated = true;
-  try {
-    const res = await fetch(`${NTFY_BACKUP_URL}/json?poll=1&since=24h`);
-    if (!res.ok) return;
-    const text = await res.text();
-    if (!text.trim()) return;
-    const lines = text.trim().split('\n');
-    for (const line of lines) {
-      try {
-        const env = JSON.parse(line);
-        if (env && typeof env.message === 'string') {
-          const data = JSON.parse(env.message);
-          if (data.invites) {
-            store.invites = mergeInvitesMap(store.invites, data.invites);
-          }
-          if (data.match && data.match.id) {
-            const msgTs = Number(data.ts) || (env.time ? env.time * 1000 : Date.now());
-            if (shouldReplaceMatch(store.match, data.match, store.ts, msgTs)) {
-              store.match = data.match;
-              store.ts = msgTs;
-            }
-          }
-        }
-      } catch {}
-    }
-    if (store.match) {
-      store.match = applyInvitesToMatch(store.match, store.invites);
-    }
-  } catch {}
+// Farklı id'li bir maçın mevcut maçın yerine geçip geçemeyeceği.
+// "Son yazan kazanır" YOK: sadece daha yüksek maç numarası ya da aynı numarada daha yeni oluşturulmuş maç kazanır.
+function canReplaceWithDifferentMatch(cur, inc) {
+  if (!cur || !cur.id) return true;
+  if (isDefaultMatch(inc) && !isDefaultMatch(cur)) return false;
+  if (isDefaultMatch(cur) && !isDefaultMatch(inc)) return true;
+  const cn = cur.matchNumber || 0;
+  const inn = inc.matchNumber || 0;
+  if (inn > cn) return true;
+  if (inn < cn) return false;
+  return (inc.createdAt || 0) > (cur.createdAt || 0);
+}
+
+async function loadState(db) {
+  const snap = await db.collection(STATE_PATH[0]).doc(STATE_PATH[1]).get();
+  return snap.exists ? { ...emptyState(), ...snap.data() } : emptyState();
+}
+
+function respond(res, state, extra = {}) {
+  const match = state.match ? applyInvitesToMatch(state.match, state.invites) : null;
+  return res.status(200).json({
+    ok: true,
+    ts: state.ts || 0,
+    match,
+    invites: state.invites || {},
+    serverTime: Date.now(),
+    ...extra,
+  });
 }
 
 export default async function handler(req, res) {
@@ -152,77 +135,84 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+  if (req.method === 'OPTIONS') return res.status(200).end();
+
+  let db;
+  try {
+    db = getDb();
+  } catch (err) {
+    // Asla belleğe geri dönme: sessizce boş/eski veri göstermektense hata ver.
+    return res.status(503).json({ ok: false, error: 'storage_unavailable', message: err.message });
   }
 
-  await hydrateFromBackupIfNeeded();
-
-  if (req.method === 'POST') {
-    try {
-      const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
+  try {
+    if (req.method !== 'POST') {
       const now = Date.now();
-
-      if (body.invites && typeof body.invites === 'object') {
-        store.invites = mergeInvitesMap(store.invites, body.invites);
+      if (!readCache.state || now - readCache.at > READ_CACHE_MS) {
+        readCache = { at: now, state: await loadState(db) };
       }
-
-      if (body.invite && body.invite.playerId) {
-        store.invites = mergeInvitesMap(store.invites, {
-          [body.invite.playerId]: body.invite,
-        });
-      }
-
-      if (body.match && body.match.id) {
-        if (body.match.attendanceRequests) {
-          store.invites = mergeInvitesMap(store.invites, body.match.attendanceRequests);
-        }
-        if (shouldReplaceMatch(store.match, body.match, store.ts, now)) {
-          store.match = body.match;
-          store.ts = now;
-        }
-      }
-
-      if (store.match) {
-        store.match = applyInvitesToMatch(store.match, store.invites);
-        store.ts = now;
-      }
-
-      // Async backup push (throttled on server side so never rate-limited)
-      if (now - store.lastBackupPush > 4000 || body.invite) {
-        store.lastBackupPush = now;
-        fetch(NTFY_BACKUP_URL, {
-          method: 'POST',
-          body: JSON.stringify({
-            ts: store.ts,
-            match: store.match,
-            invites: store.invites,
-          }),
-        }).catch(() => {});
-      }
-
-      return res.status(200).json({
-        ok: true,
-        ts: store.ts,
-        match: store.match,
-        invites: store.invites,
-        serverTime: now,
-      });
-    } catch (err) {
-      return res.status(200).json({
-        ok: false,
-        ts: store.ts,
-        match: store.match,
-        invites: store.invites,
-      });
+      return respond(res, readCache.state);
     }
-  }
 
-  return res.status(200).json({
-    ok: true,
-    ts: store.ts,
-    match: store.match ? applyInvitesToMatch(store.match, store.invites) : null,
-    invites: store.invites,
-    serverTime: Date.now(),
-  });
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
+    const now = Date.now();
+    const ref = db.collection(STATE_PATH[0]).doc(STATE_PATH[1]);
+
+    const finalState = await db.runTransaction(async tx => {
+      const snap = await tx.get(ref);
+      let state = snap.exists ? { ...emptyState(), ...snap.data() } : emptyState();
+      let changed = false;
+
+      // 1) Maç
+      if (body.match && body.match.id) {
+        const inc = body.match;
+        if (!state.match || !state.match.id) {
+          state = { match: inc, ts: now, invites: {} };
+          state.invites = mergeInvitesMap({}, inc.attendanceRequests);
+          changed = true;
+        } else if (state.match.id === inc.id) {
+          state.match = mergeSameMatch(state.match, inc);
+          state.invites = mergeInvitesMap(state.invites, inc.attendanceRequests);
+          changed = true;
+        } else if (canReplaceWithDifferentMatch(state.match, inc)) {
+          // Yeni maç: eski maçın davetleri yeni maça taşınmaz.
+          state.match = inc;
+          state.invites = mergeInvitesMap({}, inc.attendanceRequests);
+          changed = true;
+        }
+        // else: eski/bayat bir telefon eski maçı göndermiş -> yok say
+      }
+
+      // 2) Davetler (sadece mevcut maça ait olanlar)
+      const curId = state.match && state.match.id;
+      if (curId) {
+        const bodyMatchOk = !body.match || body.match.id === curId;
+        const accept = inv => inv && inv.playerId && (!inv.matchId || inv.matchId === curId) && bodyMatchOk;
+
+        if (body.invites && typeof body.invites === 'object' && bodyMatchOk) {
+          const ok = {};
+          for (const [pid, inv] of Object.entries(body.invites)) if (accept(inv)) ok[pid] = inv;
+          state.invites = mergeInvitesMap(state.invites, ok);
+          changed = true;
+        }
+        if (accept(body.invite)) {
+          state.invites = mergeInvitesMap(state.invites, { [body.invite.playerId]: body.invite });
+          changed = true;
+        }
+        state.match = applyInvitesToMatch(state.match, state.invites);
+      }
+
+      if (changed) {
+        state.ts = now;
+        tx.set(ref, state);
+      }
+      return state;
+    });
+
+    readCache = { at: Date.now(), state: finalState };
+    return respond(res, finalState);
+  } catch (err) {
+    console.error('sync error:', err && err.message);
+    return res.status(500).json({ ok: false, error: 'server_error' });
+  }
 }

@@ -1420,8 +1420,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const balanced = balanceTeams(defaultSquad, playersMap);
 
     const newM: Match = {
-      id: `match_${nextNumber}`,
+      id: `match_${nextNumber}_${Date.now().toString(36)}`,
       matchNumber: nextNumber,
+      createdAt: Date.now(),
       date,
       time,
       venueId,

@@ -228,6 +228,7 @@ export interface AttendanceRequest {
 export interface Match {
   id: string;
   matchNumber: number;
+  createdAt?: number; // maç oluşturulma zamanı (ms) - aynı numaralı maçlarda hangisi yeni diye bakılır
   date: string; // YYYY-MM-DD
   time: string; // "21:00 - 22:00"
   venueId?: string;

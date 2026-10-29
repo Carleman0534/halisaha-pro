@@ -58,7 +58,8 @@ export function getSavedAttendanceRequests(
     const globalReqs = globalRaw ? JSON.parse(globalRaw) : {};
     const matchRaw = matchId ? localStorage.getItem(`${STORAGE_KEY_INVITES}_${matchId}`) : null;
     const matchReqs = matchRaw ? JSON.parse(matchRaw) : {};
-    return { ...globalReqs, ...matchReqs };
+    // Sadece ilgili maçın davetleri döner; başka maçların davetleri sızmasın.
+    return matchId ? matchReqs : globalReqs;
   } catch {
     return {};
   }
@@ -190,24 +191,22 @@ function shouldAcceptIncomingMatch(incoming: Match, incomingTs: number): boolean
     const localMatch = JSON.parse(rawLocal) as Match;
     if (!localMatch || !localMatch.id) return true;
 
+    // Aynı maç: sunucudaki sürüm (davetler sunucuda birleştirilir) kabul edilir.
+    if (localMatch.id === incoming.id) return true;
+
     const localIsDefault = localMatch.id === 'match_current' && (localMatch.matchNumber || 44) <= 44;
     const incIsDefault = incoming.id === 'match_current' && (incoming.matchNumber || 44) <= 44;
+    if (!localIsDefault && incIsDefault) return false;
+    if (localIsDefault && !incIsDefault) return true;
 
-    // Never let a default initial match (Week 44) overwrite a newly created match (e.g. Week 46)
-    if (!localIsDefault && incIsDefault) {
-      return false;
-    }
-    if (localIsDefault && !incIsDefault) {
-      return true;
-    }
-    if ((incoming.matchNumber || 0) > (localMatch.matchNumber || 0)) {
-      return true;
-    }
-    if ((incoming.matchNumber || 0) < (localMatch.matchNumber || 0)) {
-      return false;
-    }
+    const ln = localMatch.matchNumber || 0;
+    const inn = incoming.matchNumber || 0;
+    if (inn > ln) return true;
+    if (inn < ln) return false;
+    // Aynı numara, farklı maç: daha yeni oluşturulan kazanır (sunucu zaten bunu seçiyor).
+    return (incoming.createdAt || 0) >= (localMatch.createdAt || 0);
   } catch {}
-  return incomingTs >= getLocalMatchTimestamp();
+  return true;
 }
 
 export function getLocalMatchTimestamp(): number {
@@ -241,6 +240,7 @@ function buildCompactMatchForCloud(match: Match): Match {
   return stripUndefined({
     id: match.id,
     matchNumber: match.matchNumber,
+    createdAt: match.createdAt,
     date: match.date,
     time: match.time,
     venueId: match.venueId,
@@ -306,11 +306,6 @@ export async function pushPlayerInviteToCloud(
     }),
   }).catch(() => {});
 
-  // 2. Dedicated lightweight invite SSE channel (~220 bytes)
-  fetch(CLOUD_INVITE_URL, {
-    method: 'POST',
-    body: JSON.stringify(invitePacket),
-  }).catch(() => {});
 }
 
 export async function pushMatchToCloudSync(match: Match, ts: number): Promise<void> {
@@ -327,158 +322,28 @@ export async function pushMatchToCloudSync(match: Match, ts: number): Promise<vo
     }),
   }).catch(() => {});
 
-  // 2. Debounced push to ntfy.sh so rapid button clicks never trigger HTTP 429
-  if (pushDebounceTimer) {
-    clearTimeout(pushDebounceTimer);
-  }
-  pushDebounceTimer = setTimeout(() => {
-    const payload = JSON.stringify({
-      t: 'match_sync',
-      ts,
-      sid: CLIENT_INSTANCE_ID,
-      match: compact,
-    });
-    fetch(CLOUD_SYNC_URL, {
-      method: 'POST',
-      body: payload,
-    }).catch(() => {});
-  }, 600);
 }
 
 export async function fetchLatestMatchFromCloudSync(
-  force: boolean = false
+  _force: boolean = false
 ): Promise<{ match: Match; ts: number } | null> {
+  // Tek doğru kaynak: Firestore'a bağlı /api/sync. Başka (herkese açık) kanallardan veri çekilmez.
   try {
-    // 1. Always try fast same-origin Vercel API (/api/sync) first (zero rate limits!)
-    try {
-      const apiRes = await fetch(`/api/sync?t=${Date.now()}`, {
-        cache: 'no-store',
-      });
-      if (apiRes.ok) {
-        const apiData = await apiRes.json();
-        if (apiData && apiData.invites) {
-          saveAttendanceRequestsLocal(apiData.match?.id || 'match_current', apiData.invites);
-        }
-        if (apiData && apiData.match && apiData.match.id) {
-          return {
-            match: mergeMatchWithSavedInvites(apiData.match as Match),
-            ts: Number(apiData.ts) || Date.now(),
-          };
-        }
+    const apiRes = await fetch(`/api/sync?t=${Date.now()}`, { cache: 'no-store' });
+    if (!apiRes.ok) return null;
+    const apiData = await apiRes.json();
+    if (!apiData || !apiData.ok) return null;
+    if (apiData.match && apiData.match.id) {
+      if (apiData.invites) {
+        saveAttendanceRequestsLocal(apiData.match.id, apiData.invites);
       }
-    } catch {}
-
-    // 2. Also check lightweight invite channel & ntfy sync channel (throttled to avoid 429)
-    const now = Date.now();
-    if (!force && now - lastCloudFetchTime < 10000) {
-      return null;
+      return {
+        match: mergeMatchWithSavedInvites(apiData.match as Match),
+        ts: Number(apiData.ts) || Date.now(),
+      };
     }
-    lastCloudFetchTime = now;
-
-    // Fetch lightweight invites first
-    try {
-      const invRes = await fetch(`${CLOUD_INVITE_URL}/json?poll=1&since=24h`, {
-        cache: 'no-store',
-      });
-      if (invRes.ok) {
-        const invText = await invRes.text();
-        if (invText.trim()) {
-          const invLines = invText.trim().split('\n');
-          const collectedInvites: NonNullable<Match['attendanceRequests']> = {};
-          for (const line of invLines) {
-            try {
-              const env = JSON.parse(line);
-              if (env && typeof env.message === 'string') {
-                const p = JSON.parse(env.message);
-                if (p && p.t === 'player_invite' && p.playerId && p.requestedAt) {
-                  const candidate = {
-                    playerId: p.playerId,
-                    requestedAt: p.requestedAt,
-                    requestedBy: p.requestedBy || 'Konsey',
-                    status: (p.status === 'responded' ? 'responded' : 'pending') as 'pending' | 'responded',
-                    ...(p.respondedAt ? { respondedAt: p.respondedAt } : {}),
-                  };
-                  const prev = collectedInvites[p.playerId];
-                  if (!prev || getEffectiveInviteTime(candidate) >= getEffectiveInviteTime(prev)) {
-                    collectedInvites[p.playerId] = candidate;
-                  }
-                }
-              }
-            } catch {}
-          }
-          if (Object.keys(collectedInvites).length > 0) {
-            saveAttendanceRequestsLocal('global', collectedInvites);
-          }
-        }
-      }
-    } catch {}
-
-    const res = await fetch(`${CLOUD_SYNC_URL}/json?poll=1&since=12h`, {
-      cache: 'no-store',
-    });
-    if (!res.ok) {
-      const rawLocal = localStorage.getItem(STORAGE_KEY_MATCH);
-      if (rawLocal) {
-        const mergedLocal = mergeMatchWithSavedInvites(JSON.parse(rawLocal) as Match);
-        return { match: mergedLocal, ts: Date.now() };
-      }
-      return null;
-    }
-    const text = await res.text();
-    if (!text.trim()) return null;
-
-    const lines = text.trim().split('\n');
-    let latest: { match: Match; ts: number } | null = null;
-    const streamInvites: NonNullable<Match['attendanceRequests']> = {};
-
-    for (const line of lines) {
-      try {
-        const envelope = JSON.parse(line);
-        if (envelope && envelope.event === 'message' && typeof envelope.message === 'string') {
-          const parsed = JSON.parse(envelope.message);
-          if (parsed && parsed.t === 'match_sync' && parsed.match && parsed.match.id) {
-            const incomingMatch = parsed.match as Match;
-            if (incomingMatch.attendanceRequests) {
-              Object.entries(incomingMatch.attendanceRequests).forEach(([pid, r]) => {
-                if (!r) return;
-                const prev = streamInvites[pid];
-                if (!prev || getEffectiveInviteTime(r) >= getEffectiveInviteTime(prev)) {
-                  streamInvites[pid] = r;
-                }
-              });
-            }
-            const serverTs = envelope.time ? envelope.time * 1000 : Number(parsed.ts) || 0;
-            if (!latest) {
-              latest = { match: incomingMatch, ts: serverTs };
-            } else {
-              const curIsDefault = latest.match.id === 'match_current' && (latest.match.matchNumber || 44) <= 44;
-              const incIsDefault = incomingMatch.id === 'match_current' && (incomingMatch.matchNumber || 44) <= 44;
-              if (
-                (curIsDefault && !incIsDefault) ||
-                (! (!curIsDefault && incIsDefault) &&
-                  ((incomingMatch.matchNumber || 0) > (latest.match.matchNumber || 0) ||
-                    ((incomingMatch.matchNumber || 0) === (latest.match.matchNumber || 0) && serverTs >= latest.ts)))
-              ) {
-                latest = { match: incomingMatch, ts: serverTs };
-              }
-            }
-          }
-        }
-      } catch {}
-    }
-
-    if (Object.keys(streamInvites).length > 0) {
-      saveAttendanceRequestsLocal(latest?.match?.id || 'global', streamInvites);
-    }
-
-    if (latest) {
-      latest.match = mergeMatchWithSavedInvites(latest.match);
-    }
-
-    return latest;
-  } catch {
-    return null;
-  }
+  } catch {}
+  return null;
 }
 
 export function loadSavedFirebaseConfig(): FirebaseConfig | null {
@@ -729,18 +594,8 @@ export function subscribeToMatchUpdates(
   // 1. Initial Cloud Sync check on mount / user switch
   fetchLatestMatchFromCloudSync(true).then(cloudData => {
     if (!isActive) return;
-    const localTs = getLocalMatchTimestamp();
-
     if (cloudData && cloudData.match) {
       applyIncomingMatch(cloudData.match, cloudData.ts);
-    } else if (!cloudData && localTs > 0) {
-      try {
-        const rawLocal = localStorage.getItem(STORAGE_KEY_MATCH);
-        if (rawLocal) {
-          const parsedLocal = mergeMatchWithSavedInvites(JSON.parse(rawLocal) as Match);
-          pushMatchToCloudSync(parsedLocal, localTs);
-        }
-      } catch {}
     }
   });
 
@@ -749,48 +604,6 @@ export function subscribeToMatchUpdates(
     pollInterval = setInterval(checkCloudSync, 3500);
     window.addEventListener('focus', checkCloudSyncForced);
     document.addEventListener('visibilitychange', handleVisibilityChange);
-  }
-
-  // 2. Live Server-Sent Events (SSE) subscription for real-time cross-device updates & invites
-  if (typeof window !== 'undefined' && typeof EventSource !== 'undefined') {
-    try {
-      inviteEventSource = new EventSource(`${CLOUD_INVITE_URL}/sse`);
-      inviteEventSource.onmessage = event => {
-        if (!isActive || !event.data) return;
-        try {
-          const envelope = JSON.parse(event.data);
-          if (envelope && typeof envelope.message === 'string') {
-            const parsed = JSON.parse(envelope.message);
-            if (parsed && parsed.t === 'player_invite' && parsed.playerId) {
-              applyInvitePacket(parsed);
-            }
-          }
-        } catch {}
-      };
-    } catch {}
-
-    try {
-      eventSource = new EventSource(`${CLOUD_SYNC_URL}/sse`);
-      eventSource.onmessage = event => {
-        if (!isActive || !event.data) return;
-        try {
-          const envelope = JSON.parse(event.data);
-          if (envelope && typeof envelope.message === 'string') {
-            const parsed = JSON.parse(envelope.message);
-            if (
-              parsed &&
-              parsed.t === 'match_sync' &&
-              parsed.sid !== CLIENT_INSTANCE_ID &&
-              parsed.match &&
-              parsed.match.id
-            ) {
-              const incomingTs = envelope.time ? envelope.time * 1000 : Number(parsed.ts) || Date.now();
-              applyIncomingMatch(parsed.match as Match, incomingTs);
-            }
-          }
-        } catch {}
-      };
-    } catch {}
   }
 
   // 3. Firestore realtime subscription (if configured)
