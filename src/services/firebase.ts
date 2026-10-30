@@ -483,8 +483,6 @@ export function subscribeToMatchUpdates(
 ): () => void {
   let unsubscribeFirestore: (() => void) | null = null;
   let unsubscribeActiveMatch: (() => void) | null = null;
-  let eventSource: EventSource | null = null;
-  let inviteEventSource: EventSource | null = null;
   let pollInterval: ReturnType<typeof setInterval> | null = null;
   let isActive = true;
 
@@ -665,16 +663,6 @@ export function subscribeToMatchUpdates(
     isActive = false;
     if (pollInterval) {
       clearInterval(pollInterval);
-    }
-    if (inviteEventSource) {
-      try {
-        inviteEventSource.close();
-      } catch {}
-    }
-    if (eventSource) {
-      try {
-        eventSource.close();
-      } catch {}
     }
     if (unsubscribeActiveMatch) unsubscribeActiveMatch();
     if (unsubscribeFirestore) unsubscribeFirestore();
