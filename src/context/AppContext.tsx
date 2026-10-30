@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import {
   Player,
   Match,
@@ -65,6 +65,15 @@ import {
 } from '../services/notifications';
 import { sendPushNotification, syncPushRegistration } from '../services/push';
 import { isPlayerExemptForMatch } from '../utils/permissions';
+import {
+  SYNC_COLLECTIONS,
+  stableStringify,
+  fetchAllCollections,
+  pushCollectionItems,
+  pushDeletion,
+  type SyncCollection,
+  type AllCollections,
+} from '../services/dataSync';
 
 interface AppContextType {
   players: Player[];
@@ -284,6 +293,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       saveLocalVenues(next);
       return next;
     });
+    pushDeletion('venues', venueId).then(res => {
+      if (res) syncedRef.current.venues[venueId] = stableStringify({ id: venueId, deleted: true });
+    });
   };
 
   const [currentEvaluator, setCurrentEvaluator] = useState<Evaluator>(COUNCIL_MEMBERS[0]);
@@ -415,6 +427,169 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     return () => unsubscribe();
   }, [currentMatch.id, firebaseActive]);
+
+  // ==========================================================
+  // Oyuncu / saha / geçmiş maç verisinin ortak (sunucu) senkronizasyonu
+  // Sunucu tek doğru kaynaktır; telefondaki kopya sadece önbellektir.
+  // ==========================================================
+  const playersRef = useRef<Player[]>(players);
+  const venuesRef = useRef<Venue[]>(venues);
+  const pastMatchesRef = useRef<Match[]>(pastMatches);
+  playersRef.current = players;
+  venuesRef.current = venues;
+  pastMatchesRef.current = pastMatches;
+
+  // Sunucuyla son eşleşen sürüm: koleksiyon -> id -> kararlı JSON
+  const syncedRef = useRef<Record<SyncCollection, Record<string, string>>>({
+    players: {},
+    venues: {},
+    pastMatches: {},
+  });
+  const firstPullDoneRef = useRef(false);
+  const flushingRef = useRef(false);
+  const [cloudReady, setCloudReady] = useState(false);
+  const [syncTick, setSyncTick] = useState(0);
+
+  const ingestCollection = (c: SyncCollection, serverItems: Record<string, any> | undefined) => {
+    if (!serverItems) return;
+    const isFirst = !firstPullDoneRef.current;
+    const synced = syncedRef.current[c];
+    const local: any[] =
+      c === 'players' ? playersRef.current : c === 'venues' ? venuesRef.current : pastMatchesRef.current;
+    const byId = new Map<string, any>(local.map(i => [i.id, i]));
+    let changed = false;
+
+    for (const [id, raw] of Object.entries(serverItems)) {
+      if (!raw) continue;
+      if (raw.deleted) {
+        if (byId.has(id)) {
+          byId.delete(id);
+          changed = true;
+        }
+        synced[id] = stableStringify(raw);
+        continue;
+      }
+      const item = c === 'players' ? recalculatePlayerStats(raw as Player) : raw;
+      const serverJson = stableStringify(item);
+      const cur = byId.get(id);
+      if (!cur) {
+        byId.set(id, item);
+        synced[id] = serverJson;
+        changed = true;
+        continue;
+      }
+      const curJson = stableStringify(cur);
+      if (curJson === serverJson) {
+        synced[id] = serverJson;
+        continue;
+      }
+      // Bu telefonda henüz gönderilmemiş yerel değişiklik varsa ona dokunma.
+      const dirty = !isFirst && synced[id] !== undefined && curJson !== synced[id];
+      if (dirty) continue;
+      byId.set(id, item);
+      synced[id] = serverJson;
+      changed = true;
+    }
+
+    if (!changed) return;
+    let next = Array.from(byId.values());
+    if (c === 'pastMatches') {
+      next = next.sort(
+        (a: Match, b: Match) =>
+          (b.matchNumber || 0) - (a.matchNumber || 0) || (b.date || '').localeCompare(a.date || '')
+      );
+      pastMatchesRef.current = next;
+      setPastMatches(next);
+      saveLocalPastMatches(next);
+    } else if (c === 'venues') {
+      venuesRef.current = next;
+      setVenues(next);
+      saveLocalVenues(next);
+    } else {
+      playersRef.current = next;
+      setPlayers(next);
+      saveLocalPlayers(next);
+    }
+  };
+
+  const ingestAll = (data: AllCollections) => {
+    SYNC_COLLECTIONS.forEach(c => ingestCollection(c, data[c]));
+  };
+
+  // 1) Sunucudan çek: açılışta, her 15 sn'de bir ve uygulamaya dönüldüğünde
+  useEffect(() => {
+    let stopped = false;
+    const pull = async () => {
+      const data = await fetchAllCollections();
+      if (stopped || !data) return;
+      ingestAll(data);
+      if (!firstPullDoneRef.current) {
+        firstPullDoneRef.current = true;
+        setCloudReady(true);
+      }
+      setSyncTick(t => t + 1); // başarısız bir gönderim varsa yeniden dene
+    };
+    pull();
+    const iv = setInterval(pull, 15000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') pull();
+    };
+    window.addEventListener('focus', pull);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      stopped = true;
+      clearInterval(iv);
+      window.removeEventListener('focus', pull);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 2) Değişenleri sunucuya gönder (ilk çekme tamamlanmadan göndermez: eski veri sunucuyu ezmesin)
+  useEffect(() => {
+    if (!cloudReady) return;
+    const timer = setTimeout(async () => {
+      if (flushingRef.current) return;
+      flushingRef.current = true;
+      try {
+        for (let round = 0; round < 3; round++) {
+          let sentAny = false;
+          for (const c of SYNC_COLLECTIONS) {
+            const items: any[] =
+              c === 'players' ? playersRef.current : c === 'venues' ? venuesRef.current : pastMatchesRef.current;
+            const synced = syncedRef.current[c];
+            const fresh: any[] = [];
+            const edited: any[] = [];
+            const sentJson: Record<string, string> = {};
+            for (const it of items) {
+              const j = stableStringify(it);
+              if (synced[it.id] === j) continue;
+              sentJson[it.id] = j;
+              (synced[it.id] === undefined ? fresh : edited).push(it);
+            }
+            for (const [list, seed] of [
+              [fresh, true],
+              [edited, false],
+            ] as [any[], boolean][]) {
+              if (list.length === 0) continue;
+              const res = await pushCollectionItems(c, list, seed);
+              if (!res) return; // ağ/sunucu hatası: sonraki çekmede tekrar denenir
+              sentAny = true;
+              list.forEach(it => {
+                synced[it.id] = sentJson[it.id];
+              });
+              ingestAll(res);
+            }
+          }
+          if (!sentAny) break;
+        }
+      } finally {
+        flushingRef.current = false;
+      }
+    }, 700);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [players, venues, pastMatches, cloudReady, syncTick]);
 
   // Fast map lookup
   const playersMap = useMemo(() => {

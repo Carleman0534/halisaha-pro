@@ -21,10 +21,6 @@ const STORAGE_KEY_INVITES = 'halisaha_local_attendance_requests';
 const STORAGE_KEY_INVITES_GLOBAL = 'halisaha_local_attendance_requests_global';
 
 // Zero-config realtime cloud sync channels
-const CLOUD_SYNC_TOPIC = 'halisaha_pro_carleman0534_sync_v2';
-const CLOUD_SYNC_URL = `https://ntfy.sh/${CLOUD_SYNC_TOPIC}`;
-const CLOUD_INVITE_TOPIC = 'halisaha_pro_invites_v3';
-const CLOUD_INVITE_URL = `https://ntfy.sh/${CLOUD_INVITE_TOPIC}`;
 const CLIENT_INSTANCE_ID = `cli_${Math.random().toString(36).slice(2, 10)}`;
 
 let firestoreInstance: Firestore | null = null;
